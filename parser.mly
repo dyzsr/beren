@@ -1,17 +1,45 @@
 %{
-  open Ast
+
+open Ast
+
+(* val_of_fun: convert function definition into value bindings *)
+let val_of_fun expr = function
+  | [], _ -> failwith "val_of_fun: no enough arguments"
+  | patterns, type_tag ->
+    let rec aux = function
+      | arg :: [] -> begin
+        match type_tag with
+          | None -> LambdaExpr [(arg, expr)]
+          | Some t -> LambdaExpr [(arg, ExprWithType (expr, t))]
+        end
+      | arg :: rest -> LambdaExpr [(arg, aux rest)]
+    in aux patterns
+
 %}
 
-%token LET REC AND IN
-%token FUN TO /* fun ... -> ... */
-%token <string> IDENT
-%token <unit> UNIT
+%token LET "let" TYPE "type" METHOD "method" AND "and"
+%token REC "rec" IN "in" MUTABLE "mutable" OF "of"
+%token FUN "fun" FUNCTION "function"
+%token IF "if" THEN "then" ELSE "else"
+%token MATCH "match" WITH "with"
+%token INTERFACE "interface" END "end"
+
+%token UNIT "()"
+%token WILDCARD "_"
 %token <int> INT
 %token <bool> BOOL
-%token PLUS MINUS TIMES DIV MOD
-%token LT LTE GT GTE EQ NEQ
-%token LOGIC_AND LOGIC_OR
-%token LPAREN RPAREN
+%token <char> CHAR
+%token <string> STRING
+%token <string> IDENT
+%token <string> CAPID
+
+%token PLUS "+" MINUS "-" TIMES "*" DIV "/" MOD "%" CONCAT "^"
+%token LT "<" LTE "<=" GT ">" GTE ">=" EQ "=" NEQ "!="
+%token LOGIC_AND "&&" LOGIC_OR "||"
+%token LPAREN "(" RPAREN ")" LBRACK "[" RBRACK "]" LBRACE "{" RBRACE "}"
+%token LBRACKBAR "[|" RBRACKBAR "|]"
+%token BAR "|" APPEND "@" CONS "::" DEREF "!" TO "->" HASH "#"
+%token SEMICOLON ";" COLON ":" COMMA "," PERIOD "." QUOTE "'"
 
 %start global_decl
 %type <Ast.decl> global_decl
@@ -20,111 +48,392 @@
 %%
 
 global_decl:
-    decl = fun_decl { decl }
-  | decl = val_decl { decl }
-  ;
+    decl = let_decl { decl }
+  | decl = method_decl { decl }
+  | decl = type_decl { decl }
 
-fun_decl:
-    LET is_rec=is_rec id=IDENT args=arg_list EQ body=expr {
-      let func = Function (Prototype (args, body)) in
-      GlobalDecl (Some id, is_rec, func)
-      GlobalDecl {is_rec=false; bindings=[]}
-    }
+let_decl:
+    "let" r=is_rec b=let_binding
+    { ValueBinding (r, [b]) }
+  | "let" r=is_rec b=let_binding "and" l=let_binding_list
+    { ValueBinding (r, b::l) }
   ;
 
 is_rec:
-        { false }
-  | REC { true }
+    { false }
+  | "rec" { true }
   ;
 
-fun_bindings:
-    binding=fun_binding {
-      match bindings with
-      | 
-    }
-  | fun_binding AND fun_bindings {}
-  ;
+let_binding_list:
+    b=let_binding { [b] }
+  | b=let_binding "and" l=let_binding_list { b :: l }
+
+let_binding:
+    b=val_binding { b }
+  | b=fun_binding { b }
+
+val_binding:
+    p=pattern "=" e=expr { (p, e) }
 
 fun_binding:
-    id=IDENT args=arg_list EQ body=expr { (id, Function (Prototype args, expr)) }
-  ;
+    id=IDENT proto=prototype "=" e=expr
+      { (VariablePattern id, val_of_fun e proto) }
+
+method_decl:
+    "method" r=receiver b=fun_binding
+      { MethodBinding (r, (true, [b])) }
+  | "method" r=receiver b=fun_binding "and" l=method_binding_list
+      { MethodBinding (r, (true, b::l)) }
+
+receiver:
+    p=pattern_with_type { p }
+
+method_binding_list:
+    b=fun_binding { [b] }
+  | b=fun_binding "and" l=method_binding_list { b :: l }
+
+prototype:
+    l=arg_list { Prototype (l, None) }
+  | l=arg_list ":" t=type_expr { Prototype (l, Some t) }
 
 arg_list:
-    id=ident_opt { [id] }
-  | id=ident_opt rest=arg_list { id :: rest }
-  ; 
+    p=pattern { [p] }
+  | p=pattern l=arg_list { p :: l }
 
-val_decl:
-    LET id=ident_opt EQ body=expr { GlobalDecl (id, false, body) }
-  ;
+type_decl:
+    "type" b=type_binding
+    { TypeBinding (true, [b]) }
+  | "type" b=type_binding "and" l=type_binding_list
+    { TypeBinding (true, b::l) }
 
-ident_opt:
-    id=IDENT { Some id }
-  | unit     { None }
-  ;
+type_binding_list:
+    b=type_binding { [b] }
+  | b=type_binding "and" l=type_binding_list { b :: l }
+
+type_binding:
+    p=type_param id=IDENT "=" t=type_construct { (p, id, t) }
+
+type_param:
+    t=type_symbol { [t] }
+  | "(" t=type_symbol "," l=type_symbol_list ")" { t :: l }
+
+type_symbol_list:
+    t=type_symbol { [t] }
+  | t=type_symbol "," l=type_symbol_list { t :: l }
+
+type_symbol:
+    "'" id=IDENT { TypeSymbol id }
+
+type_construct:
+    t=type_expr { t }
+  | t=variant_type { t }
+  | t=record_type { t }
+  | t=interface_type { t }
+
+variant_type:
+    l=variant_list { VariantType l }
+  | "|" l=variant_list { VariantType l }
+
+variant_list:
+    t=variant { [t] }
+  | t=variant "|" l=variant_list { t :: l }
+
+variant:
+    cid=CAPID { (cid, None) }
+  | cid=CAPID "of" t=type_expr { (cid, Some t) }
+
+record_type:
+    "{" "}" { RecordType [] }
+  | "{" l=field_type_list "}" { RecordType l }
+  | "{" l=field_type_list "," "}" { RecordType l }
+
+field_type_list:
+    t=field_type { [t] }
+  | t=field_type "," l=field_type_list { t :: l }
+
+field_type:
+    m=is_mutable id=IDENT "=" t=type_expr { (m, id, t) }
+
+is_mutable:
+    { false }
+  | "mutable" { true }
+
+interface_type:
+    "interface" "end" { InterfaceType [] }
+  | "interface" l=method_type_list "end" { InterfaceType l }
+  | "interface" l=method_type_list "," "end" { InterfaceType l }
+
+method_type_list:
+    t=method_type { [t] }
+  | t=method_type "," l=method_type_list { t :: l }
+
+method_type:
+    id=IDENT ":" t=must_function_type { (id, t) }
+
+type_expr:
+    t=type_infix_function { t }
+
+type_infix_function:
+    t=type_infix_tuple { t }
+  | t=must_function_type { FunctionType t }
+
+must_function_type:
+    a=type_infix_tuple "->" b=type_infix_function { (a, b) }
+
+type_infix_tuple:
+    t=type_inner_expr { t }
+  | l=must_tuple_type { TupleType l }
+
+must_tuple_type:
+    a=type_inner_expr "*" b=type_inner_expr { [a; b] }
+  | t=type_inner_expr "*" l=must_tuple_type { t :: l }
+
+type_inner_expr:
+    t=type_terminal { t }
+  | t=type_specialization { t }
+  | "(" t=type_expr ")" { t }
+
+type_specialization:
+    t=type_expr id=IDENT { SpecializedType (t, id) }
+
+type_terminal:
+    id=IDENT { SingleType (TypeName id) }
+  | t=type_symbol { SingleType t }
 
 expr:
-    e=bin_op { e }
-  ;
+    e=local_expr { e }
+  | e=if_expr { e }
+  | e=match_expr { e }
+  | e=lambda_expr { e }
+  | e=infix_op { e }
+  | "(" e=expr ":" t=type_expr ")" { ExprWithType (e, t) }
 
-bin_expr:
-    e=logic_or_op { e }
-  ;
+local_expr:
+    d=let_decl "in" e=expr { Local (d, e) }
 
-logic_or_op:
-    e=logic_and_op { e }
-  | e1=logic_or_op LOGIC_OR e2=logic_and_op { Binary (Or, e1, e2) }
-  ;
+if_expr:
+    "if" cond=expr "then" e=expr { IfExpr (cond, e, None) }
+  | "if" cond=expr "then" a=expr "else" b=expr { IfExpr (cond, a, Some b) }
 
-logic_and_op:
-    cmp_op {}
-  | logic_and_op LOGIC_AND cmp_op {}
-  ;
+match_expr:
+    "match" e=expr "with" l=match_list { MatchExpr (e, l) }
+  | "match" e=expr "with" "|" l=match_list { MatchExpr (e, l) }
 
-cmp_op:
-    plus_op {}
-  | cmp_op LT plus_op {}
-  | cmp_op LTE plus_op {}
-  | cmp_op GT plus_op {}
-  | cmp_op GTE plus_op {}
-  | cmp_op EQ plus_op {}
-  | cmp_op NEQ plus_op {}
-  ;
+match_list:
+    b=match_branch { [b] }
+  | b=match_branch "|" l=match_list { b :: l }
 
-plus_op:
-    times_op {}
-  | plus_go PLUS times_op {}
-  | plus_go MINUS times_go {}
-  ;
+match_branch:
+    p=pattern "->" e=expr { (p, e) }
 
-times_op:
-    unary_op {}
-  | times_go TIMES unary_op {}
-  | times_go DIV unary_op {}
-  | times_go MOD unary_op {}
-  ;
+lambda_expr:
+    e=fun_expr { e }
+  | e=function_expr { e }
 
-unary_op:
-    term {}
-  | PLUS unary_op {}
-  | MINUS unary_op {}
-  ;
+fun_expr:
+    "fun" proto=prototype "->" e=expr { val_of_fun e proto }
 
-term:
-    IDENT {}
-  | UNIT {}
-  | INT {}
-  | BOOL {}
-  | LPAREN expr RPAREN {}
-  | function {}
-  ;
+function_expr:
+    "function" l=match_list { LambdaExpr l }
+  | "function" "|" l=match_list { LambdaExpr l }
 
-function:
-    FUN arg_list TO expr {}
-  ;
+pattern:
+    p=single_pattern { p }
+  | a=single_pattern "|" b=pattern { ManyPattern (a, b) }
+
+single_pattern:
+    p=pattern_infix { p }
+  | p=pattern_with_type { p }
+
+pattern_with_type:
+    "(" p=pattern ":" t=type_expr ")" { PatternWithType (p, t) }
+
+pattern_infix:
+    p=pattern_infix_cons { p }
+
+pattern_infix_cons:
+    p=inner_pattern { p }
+  | hd=inner_pattern "::" tl=pattern_infix_cons { ConsPattern (hd, tl) }
+
+inner_pattern:
+    p=pattern_terminal { p }
+  | p=variant_pattern { p }
+  | "(" p=pattern ")" { p }
+
+pattern_terminal:
+    p=pattern_literal { p }
+  | p=unit_pattern { p }
+  | p=tuple_pattern { p }
+  | p=list_pattern { p }
+  | p=array_pattern { p }
+  | p=record_pattern { p }
+  | p=variable_pattern { p }
+
+pattern_literal:
+    b=BOOL { BoolPattern b }
+  | i=INT { IntPattern i }
+  | "-" i=INT { IntPattern (-i) }
+  | c=CHAR { CharPattern c }
+  | s=STRING { StringPattern s }
+
+unit_pattern:
+    unit { UnitPattern }
+
+tuple_pattern:
+    "(" p=pattern "," l=pattern_item_list ")" { TuplePattern (p::l) }
+
+list_pattern:
+    "[" "]" { ListPattern [] }
+  | "[" l=pattern_item_list "]" { ListPattern l }
+
+array_pattern:
+    "[|" "|]" { ArrayPattern [] }
+  | "[|" l=pattern_item_list "|]" { ArrayPattern l }
+
+pattern_item_list:
+    p=pattern { [p] }
+  | p=pattern "," l=pattern_item_list { p :: l }
+
+record_pattern:
+    "{" "}" { RecordPattern [] }
+  | "{" l=field_pattern_list "}" { RecordPattern l }
+  | "{" l=field_pattern_list "," "}" { RecordPattern l }
+
+field_pattern_list:
+    p=field_pattern { [p] }
+  | p=field_pattern "," l=field_pattern_list { p :: l }
+
+field_pattern:
+    id=IDENT "=" p=pattern { (id, p) }
+
+variable_pattern:
+    id=IDENT { VariablePattern id }
+  | WILDCARD { Wildcard }
+
+variant_pattern:
+    cid=CAPID { VariantPattern (cid, None) }
+  | cid=CAPID p=pattern_terminal { VariantPattern (cid, Some p) }
+  | cid=CAPID "(" p=pattern ")" { VariantPattern (cid, Some p) }
+
+infix_op:
+    e=infix_or { e }
+
+infix_or:
+    e=infix_and { e }
+  | a=infix_or "||" b=infix_and { Binary (Or, a, b) }
+
+infix_and:
+    e=infix_cmp { e }
+  | a=infix_and "&&" b=infix_cmp { Binary (And, a, b) }
+
+infix_cmp:
+    e=infix_cons { e }
+  | a=infix_cmp "<"  b=infix_append { Binary (Lt, a, b) }
+  | a=infix_cmp "<=" b=infix_append { Binary (Lte, a, b) }
+  | a=infix_cmp ">"  b=infix_append { Binary (Gt, a, b) }
+  | a=infix_cmp ">=" b=infix_append { Binary (Gte, a, b) }
+  | a=infix_cmp "="  b=infix_append { Binary (Eq, a, b) }
+  | a=infix_cmp "!=" b=infix_append { Binary (Neq, a, b) }
+
+infix_append:
+    e=infix_cons { e }
+  | a=infix_append "@" b=infix_cons { Binary (Append, a, b) }
+
+infix_cons:
+    e=infix_concat { e }
+  | a=infix_concat "::" b=infix_cons { Binary (Cons, a, b) }
+
+infix_concat:
+    e=infix_plus { e }
+  | a=infix_concat "^" b=infix_plus { Binary (Concat, a, b) }
+
+infix_plus:
+    e=infix_times { e }
+  | a=infix_plus "+" b=infix_times { Binary (Plus, a, b) }
+  | a=infix_plus "-" b=infix_times { Binary (Minus, a, b) }
+
+infix_times:
+    e=prefix_minus { e }
+  | a=infix_times "*" b=prefix_minus { Binary (Times, a, b) }
+  | a=infix_times "/" b=prefix_minus { Binary (Div, a, b) }
+  | a=infix_times "%" b=prefix_minus { Binary (Mod, a, b) }
+
+prefix_minus:
+    e=inner_expr { e }
+  | "-" e=prefix_minus { Unary (Negative, e) }
+  | "+" e=prefix_minus { Unary (Positive, e) }
+  | "!" e=prefix_minus { Unary (Deref, e) }
+
+inner_expr:
+    e=highest_prec { e }
+  | e=call { e }
+  | e=construction { e }
+
+terminal:
+    e=literal { e }
+  | e=binding { e }
+  | e=unit { e }
+  | e=tuple { e }
+  | e=list { e }
+  | e=array { e }
+  | e=record { e }
+
+literal:
+    b=BOOL { Bool b }
+  | i=INT { Int i }
+  | c=CHAR { Char c }
+  | s=STRING { String s }
+
+binding:
+    id=ident { Variable (None, id) }
+  | e=highest_prec "." id=ident { Variable (e, id) }
+
+ident:
+    id=IDENT { Ident id }
+  | cid=CAPID { CapId id }
 
 unit:
-    LPAREN RPAREN { () }
-  ;
+    "(" ")" { Unit }
+
+tuple:
+    "(" e=expr "," l=item_list ")" { Tuple (e :: l) }
+
+list:
+    "[" "]" { List [] }
+  | "[" l=item_list "]" { List l }
+
+array:
+    "[|" "|]" { Array [] }
+  | "[|" l=item_list "|]" { Array l }
+
+item_list:
+    e=expr { [e] }
+  | e=expr "," l=item_list { e :: l }
+
+record:
+    "{" "}" { Record [] }
+  | "{" l=field_list "}" { Record l }
+  | "{" l=field_list "," "}" { Record l }
+
+field_list:
+    f=field_binding { [f] }
+  | f=field_binding "," l=field_list { f :: l }
+
+field_binding:
+    id=IDENT "=" e=expr { (id, e) }
+
+call:
+    caller=expr e=highest_prec { Call (caller, e) }
+
+construction:
+    cid=CAPID e=highest_prec { Construct (cid, e) }
+
+highest_prec:
+    e=terminal { e }
+  | "(" e=expr_list ")" { e }
+
+expr_list:
+    e=expr { e }
+  | a=expr ";" b=expr_list { ManyExpr (a, b) }
 
 %%

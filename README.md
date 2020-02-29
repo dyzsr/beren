@@ -250,11 +250,11 @@ type_binding_list: type_binding
 type_binding: type_param IDENT "=" type_construct
 
 （泛型参数）
-type_param: TYPE_SYMBOL （类型参数如'a, 'b'...）
+type_param: TYPE_SYMBOL （类型参数如'a, 'b, ...）
           | type_param_tuple
 
 （多个泛型参数）
-type_param_tuple: "(" TYPE_SYMBOL, type_symbol_list ")"
+type_param_tuple: "(" TYPE_SYMBOL "," type_symbol_list ")"
 
 type_symbol_list: TYPE_SYMBOL
                 | TYPE_SYMBOL "," type_symbol_list
@@ -306,7 +306,7 @@ method_type: IDENT ":" must_function_type
 
 ```
 （类型表达式）
-type_expr: tuple_type
+type_expr: type_infix_function
 
 （函数类型）
 type_infix_function: type_infix_tuple
@@ -316,14 +316,17 @@ must_function_type: type_infix_tuple "->" type_infix_function
 
 （积类型/元组类型）
 type_infix_tuple: type_inner_expr
-                | type_inner_expr "*" type_infix_tuple
+                | must_tuple_type
+
+must_tuple_type: type_inner_expr "*" type_inner_expr
+               | type_inner_expr "*" must_tuple_type
                 
 type_inner_expr: type_terminal
-               | type_polymorphism
+               | type_specialization
                | "(" type_expr ")"
 
 （泛型特化）
-type_polymorphism: type_expr type_terminal
+type_specialization: type_expr IDENT
          
 type_terminal: TYPE_SYMBOL
              | IDENT
@@ -379,34 +382,47 @@ function_expr: "function" match_list
 
 ```
 （模式表达式）
-pattern: pattern_literal
-       | cons_pattern
-       | variant_pattern
-       | "(" pattern ")"
-       | pattern_with_type
+pattern: single_pattern
+       | single_pattern "|" pattern（多模式）
+
+（单模式）
+single_pattern: pattern_infix
+              | pattern_with_type
 
 （模式匹配类型限定）
 pattern_with_type: "(" pattern ":" type_expr ")"
 
-pattern_literal: literal
-               | negative_number
-               | unit
-               | tuple_pattern
-               | list_pattern
-               | array_pattern
-               | record_pattern
-               | variable
-               | wildcard
+pattern_infix: pattern_infix_cons
 
-negative_number: "-" INT
+（list拼接表达式的模式匹配）
+pattern_infix_cons: inner_pattern
+                  | inner_pattern "::" pattern_infix_cons
+
+inner_pattern: pattern_terminal
+             | variant_pattern
+             | "(" pattern ")"
+
+pattern_terminal: pattern_literal
+                | unit
+                | tuple_pattern
+                | list_pattern
+                | array_pattern
+                | record_pattern
+                | variable_pattern
+
+pattern_literal: BOOL
+               | INT
+               | "-" INT
+               | CHAR
+               | STRING
 
 tuple_pattern: "(" pattern "," pattern_item_list ")"
 
 list_pattern: "[" "]"
             | "[" pattern_item_list "]"
             
-array_pattern: "#[" "]"
-             | "#[" pattern_item_list "]"
+array_pattern: "[|" "|]"
+             | "[|" pattern_item_list "|]"
              
 pattern_item_list: pattern
                  | pattern "," pattern_item_list
@@ -419,20 +435,15 @@ field_pattern_list: field_pattern
                   | field_pattern "," field_pattern_list
 
 field_pattern: IDENT "=" pattern
-
-（list拼接表达式的模式匹配）
-cons_pattern: pattern "::" cons_pattern
+ 
+（变量匹配） 
+variable_pattern: IDENT （变量名）
+                | WILDCARD （通配符）
 
 （不定类型构造函数的模式匹配）
 variant_pattern: CAPID
-               | CAPID pattern_literal
+               | CAPID pattern_terminal
                | CAPID "(" pattern ")"
- 
-（变量匹配） 
-variable: IDENT
-
-（通配符）
-wildcard: UNDERSCORE
 ```
 
 ### 中缀（前缀）表达式
@@ -447,16 +458,22 @@ infix_or: infix_and
 infix_and: infix_cmp
          | infix_and "&&" infix_cmp
 
-infix_cmp: infix_plus
-         | infix_cmp "<" infix_cons
-         | infix_cmp "<=" infix_cons
-         | infix_cmp ">" infix_cons
-         | infix_cmp ">=" infix_cons
-         | infix_cmp "=" infix_cons
-         | infix_cmp "!=" infix_cons
+infix_cmp: infix_cons
+         | infix_cmp "<"  infix_append
+         | infix_cmp "<=" infix_append
+         | infix_cmp ">"  infix_append
+         | infix_cmp ">=" infix_append
+         | infix_cmp "="  infix_append
+         | infix_cmp "!=" infix_append
 
-infix_cons: infix_plus
-          | infix_plus "::" infix_cons
+infix_append: infix_cons
+            | infix_append "@" infix_cons
+
+infix_cons: infix_concat
+          | infix_concat "::" infix_cons
+
+infix_concat: infix_plus
+            | infix_concat "^" infix_plus
 
 infix_plus: infix_times
           | infix_plus "+" infix_times
@@ -475,9 +492,6 @@ prefix_minus: inner_expr
 inner_expr: highest_prec （最高优先级的表达式项）
           | call （函数调用）
           | construction （不定类型构造函数调用）
-
-expr_list: expr
-         | expr ";" expr_list （表达式拼接）
 ```
 
 ### 字面量、变量、（构造）函数调用
@@ -496,9 +510,11 @@ literal: BOOL
        | CHAR
        | STRING
 
-binding: IDENT
-       | CAPID
-       | highest_prec "." IDENT
+binding: ident
+       | highest_prec "." ident
+
+ident: IDENT
+     | CAPID
        
 unit: "(" ")"
 
@@ -507,8 +523,8 @@ tuple: "(" expr "," item_list ")"
 list: "[" "]"
     | "[" item_list "]"
 
-array: "#[" "]"
-     | "#[" item_list "]"
+array: "[|" "|]"
+     | "[|" item_list "|]"
 
 item_list: expr
          | expr "," item_list
@@ -528,6 +544,9 @@ construction: CAPID hightest_prec
 
 highest_prec: terminal
             | "(" expr_list ")"
+
+expr_list: expr
+         | expr ";" expr_list （表达式拼接）
 ```
 
 ## 4.项目计划
