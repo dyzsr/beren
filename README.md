@@ -450,7 +450,11 @@ variant_pattern: CAPID
 
 ```
 （中缀表达式）
-infix_op: infix_or
+infix_op: infix_assign
+
+infix_assign: infix_or
+            | binding ":=" infix_assign
+            | binding "<-" infix_assign
 
 infix_or: infix_and
         | infix_or "||" infix_and

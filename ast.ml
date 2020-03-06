@@ -1,5 +1,3 @@
-let rec lang = "ocaml"
-
 type decl =
   | TypeBinding of type_binding
   | ValueBinding of value_binding
@@ -18,7 +16,7 @@ and type_construct =
 
 and type_expr =
   | SingleType of type_name
-  | TupleType of type_name list
+  | TupleType of type_expr list
   | FunctionType of type_expr * type_expr
   | SpecializedType of type_expr * string
 
@@ -59,13 +57,15 @@ and expr =
   | Int of int
   | Char of char
   | String of string
-  | Variable of expr option * identifier
+  | Variable of variable
+  | Assign of variable * expr
+  | AssignRef of variable * expr
   | Tuple of expr list
   | List of expr list
   | Array of expr list
   | Record of (string * expr) list
   | Call of expr * expr
-  | Construct of expr * expr
+  | Construct of string * expr
   | Unary of unary_op * expr
   | Binary of binary_op * expr * expr
   | Local of value_binding * expr
@@ -75,9 +75,13 @@ and expr =
   | ManyExpr of expr * expr
   | ExprWithType of expr * type_expr
 
-and identifier =
-  | Ident of string
-  | CapId of string
+and variable =
+  | Expr of expr option * string
+  | Module of module_binding * string
+
+and module_binding =
+  | LeafModule of string
+  | SubModule of module_binding * string
 
 and unary_op = 
   | Positive | Negative | Deref
@@ -94,3 +98,17 @@ and match_expr = expr * (pattern * expr) list (* matching branches *)
 and lambda_expr = (pattern * expr) list (* function branches *)
 
 type prototype = Prototype of pattern list * type_expr option
+
+let rec print_decl = function
+  | TypeBinding b -> print_type_binding b
+  | ValueBinding b -> print_value_binding b
+  | MethodBinding b -> print_method_binding b
+
+and print_type_binding (r, l) =
+  ()
+
+and print_value_binding (r, l) =
+  ()
+
+and print_method_binding (p, (r, l)) =
+  ()

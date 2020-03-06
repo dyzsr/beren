@@ -3,20 +3,20 @@
 open Ast
 
 (* val_of_fun: convert function definition into value bindings *)
-let val_of_fun expr = function
-  | [], _ -> failwith "val_of_fun: no enough arguments"
-  | patterns, type_tag ->
-    let rec aux = function
-      | arg :: [] -> begin
-        match type_tag with
-          | None -> LambdaExpr [(arg, expr)]
-          | Some t -> LambdaExpr [(arg, ExprWithType (expr, t))]
-        end
-      | arg :: rest -> LambdaExpr [(arg, aux rest)]
-    in aux patterns
+let val_of_fun expr (Prototype (patterns, type_tag)) =
+  let rec aux = function
+    | [] -> failwith "val_of_fun: no enough arguments"
+    | arg :: [] -> begin
+      match type_tag with
+        | None -> LambdaExpr [(arg, expr)]
+        | Some t -> LambdaExpr [(arg, ExprWithType (expr, t))]
+      end
+    | arg :: rest -> LambdaExpr [(arg, aux rest)]
+  in aux patterns
 
 %}
 
+%token EOF
 %token LET "let" TYPE "type" METHOD "method" AND "and"
 %token REC "rec" IN "in" MUTABLE "mutable" OF "of"
 %token FUN "fun" FUNCTION "function"
@@ -24,7 +24,6 @@ let val_of_fun expr = function
 %token MATCH "match" WITH "with"
 %token INTERFACE "interface" END "end"
 
-%token UNIT "()"
 %token WILDCARD "_"
 %token <int> INT
 %token <bool> BOOL
@@ -32,31 +31,48 @@ let val_of_fun expr = function
 %token <string> STRING
 %token <string> IDENT
 %token <string> CAPID
+%token <string> TYPESYMBOL
 
 %token PLUS "+" MINUS "-" TIMES "*" DIV "/" MOD "%" CONCAT "^"
 %token LT "<" LTE "<=" GT ">" GTE ">=" EQ "=" NEQ "!="
 %token LOGIC_AND "&&" LOGIC_OR "||"
 %token LPAREN "(" RPAREN ")" LBRACK "[" RBRACK "]" LBRACE "{" RBRACE "}"
 %token LBRACKBAR "[|" RBRACKBAR "|]"
-%token BAR "|" APPEND "@" CONS "::" DEREF "!" TO "->" HASH "#"
-%token SEMICOLON ";" COLON ":" COMMA "," PERIOD "." QUOTE "'"
+%token BAR "|" APPEND "@" CONS "::" DEREF "!"
+%token TO "=>" ARROW "->"
+%token SEMICOLON ";" COLON ":" COMMA "," PERIOD "."
+%token ASSIGN ":=" ASSIGNFIELD "<-"
 
-%start global_decl
+%start program
+%type <Ast.decl list> program
 %type <Ast.decl> global_decl
 %type <Ast.expr> expr
 
+%nonassoc LAST_BRANCH
+%nonassoc BAR
+
+%nonassoc THEN
+%nonassoc ELSE
+
 %%
 
+program:
+    l=global_decl_list EOF { l }
+
+global_decl_list:
+    g=global_decl { [g] }
+  | g=global_decl l=global_decl_list { g :: l }
+
 global_decl:
-    decl = let_decl { decl }
-  | decl = method_decl { decl }
-  | decl = type_decl { decl }
+    decl = let_decl { ValueBinding decl }
+  | decl = method_decl { MethodBinding decl }
+  | decl = type_decl { TypeBinding decl }
 
 let_decl:
     "let" r=is_rec b=let_binding
-    { ValueBinding (r, [b]) }
+    { (r, [b]) }
   | "let" r=is_rec b=let_binding "and" l=let_binding_list
-    { ValueBinding (r, b::l) }
+    { (r, b::l) }
   ;
 
 is_rec:
@@ -81,9 +97,9 @@ fun_binding:
 
 method_decl:
     "method" r=receiver b=fun_binding
-      { MethodBinding (r, (true, [b])) }
+      { (r, (true, [b])) }
   | "method" r=receiver b=fun_binding "and" l=method_binding_list
-      { MethodBinding (r, (true, b::l)) }
+      { (r, (true, b::l)) }
 
 receiver:
     p=pattern_with_type { p }
@@ -97,14 +113,14 @@ prototype:
   | l=arg_list ":" t=type_expr { Prototype (l, Some t) }
 
 arg_list:
-    p=pattern { [p] }
-  | p=pattern l=arg_list { p :: l }
+    p=highest_prec_pattern { [p] }
+  | p=highest_prec_pattern l=arg_list { p :: l }
 
 type_decl:
     "type" b=type_binding
-    { TypeBinding (true, [b]) }
+    { (true, [b]) }
   | "type" b=type_binding "and" l=type_binding_list
-    { TypeBinding (true, b::l) }
+    { (true, b::l) }
 
 type_binding_list:
     b=type_binding { [b] }
@@ -122,10 +138,10 @@ type_symbol_list:
   | t=type_symbol "," l=type_symbol_list { t :: l }
 
 type_symbol:
-    "'" id=IDENT { TypeSymbol id }
+    s=TYPESYMBOL { TypeSymbol s }
 
 type_construct:
-    t=type_expr { t }
+    t=type_expr { TypeExpr t }
   | t=variant_type { t }
   | t=record_type { t }
   | t=interface_type { t }
@@ -145,10 +161,10 @@ variant:
 record_type:
     "{" "}" { RecordType [] }
   | "{" l=field_type_list "}" { RecordType l }
-  | "{" l=field_type_list "," "}" { RecordType l }
 
 field_type_list:
     t=field_type { [t] }
+  | t=field_type "," { [t] }
   | t=field_type "," l=field_type_list { t :: l }
 
 field_type:
@@ -161,10 +177,10 @@ is_mutable:
 interface_type:
     "interface" "end" { InterfaceType [] }
   | "interface" l=method_type_list "end" { InterfaceType l }
-  | "interface" l=method_type_list "," "end" { InterfaceType l }
 
 method_type_list:
     t=method_type { [t] }
+  | t=method_type "," { [t] }
   | t=method_type "," l=method_type_list { t :: l }
 
 method_type:
@@ -175,26 +191,30 @@ type_expr:
 
 type_infix_function:
     t=type_infix_tuple { t }
-  | t=must_function_type { FunctionType t }
+  | t=must_function_type { t }
 
 must_function_type:
-    a=type_infix_tuple "->" b=type_infix_function { (a, b) }
+    a=type_infix_tuple "->" b=type_infix_function { FunctionType (a, b) }
 
 type_infix_tuple:
-    t=type_inner_expr { t }
-  | l=must_tuple_type { TupleType l }
+    t=inner_type_expr { t }
+  | t=inner_type_expr "*" l=type_tuple_list { TupleType (t::l) }
 
-must_tuple_type:
-    a=type_inner_expr "*" b=type_inner_expr { [a; b] }
-  | t=type_inner_expr "*" l=must_tuple_type { t :: l }
+type_tuple_list:
+    t=inner_type_expr { [t] }
+  | t=inner_type_expr "*" l=type_tuple_list { t :: l }
 
-type_inner_expr:
+inner_type_expr:
     t=type_terminal { t }
   | t=type_specialization { t }
   | "(" t=type_expr ")" { t }
 
+highest_prec_type_expr:
+    t=type_terminal { t }
+  | "(" t=type_expr ")" { t }
+
 type_specialization:
-    t=type_expr id=IDENT { SpecializedType (t, id) }
+    t=highest_prec_type_expr id=IDENT { SpecializedType (t, id) }
 
 type_terminal:
     id=IDENT { SingleType (TypeName id) }
@@ -220,18 +240,18 @@ match_expr:
   | "match" e=expr "with" "|" l=match_list { MatchExpr (e, l) }
 
 match_list:
-    b=match_branch { [b] }
+    b=match_branch %prec LAST_BRANCH { [b] }
   | b=match_branch "|" l=match_list { b :: l }
 
 match_branch:
-    p=pattern "->" e=expr { (p, e) }
+    p=pattern "=>" e=expr { (p, e) }
 
 lambda_expr:
     e=fun_expr { e }
   | e=function_expr { e }
 
 fun_expr:
-    "fun" proto=prototype "->" e=expr { val_of_fun e proto }
+    "fun" proto=prototype "=>" e=expr { val_of_fun e proto }
 
 function_expr:
     "function" l=match_list { LambdaExpr l }
@@ -258,6 +278,10 @@ pattern_infix_cons:
 inner_pattern:
     p=pattern_terminal { p }
   | p=variant_pattern { p }
+  | "(" p=pattern ")" { p }
+
+highest_prec_pattern:
+    p=pattern_terminal { p }
   | "(" p=pattern ")" { p }
 
 pattern_terminal:
@@ -297,10 +321,10 @@ pattern_item_list:
 record_pattern:
     "{" "}" { RecordPattern [] }
   | "{" l=field_pattern_list "}" { RecordPattern l }
-  | "{" l=field_pattern_list "," "}" { RecordPattern l }
 
 field_pattern_list:
     p=field_pattern { [p] }
+  | p=field_pattern "," { [p] }
   | p=field_pattern "," l=field_pattern_list { p :: l }
 
 field_pattern:
@@ -316,7 +340,22 @@ variant_pattern:
   | cid=CAPID "(" p=pattern ")" { VariantPattern (cid, Some p) }
 
 infix_op:
+    e=infix_assign { e }
+
+infix_assign:
     e=infix_or { e }
+  | b=binding ":=" e=infix_assign
+    {
+      match b with
+      | Variable v -> AssignRef (v, e)
+      | _ -> failwith "infix_assign"
+    }
+  | b=binding "<-" e=infix_assign
+    {
+      match b with
+      | Variable v -> Assign (v, e)
+      | _ -> failwith "infix_assign"
+    }
 
 infix_or:
     e=infix_and { e }
@@ -369,6 +408,14 @@ inner_expr:
   | e=call { e }
   | e=construction { e }
 
+highest_prec:
+    e=terminal { e }
+  | "(" e=expr_list ")" { e }
+
+expr_list:
+    e=expr { e }
+  | a=expr ";" b=expr_list { ManyExpr (a, b) }
+
 terminal:
     e=literal { e }
   | e=binding { e }
@@ -385,12 +432,13 @@ literal:
   | s=STRING { String s }
 
 binding:
-    id=ident { Variable (None, id) }
-  | e=highest_prec "." id=ident { Variable (e, id) }
+    id=IDENT { Variable (Expr (None, id)) }
+  | e=highest_prec "." id=IDENT { Variable (Expr (Some e, id)) }
+  | m=module_binding "." id=IDENT { Variable (Module (m, id)) }
 
-ident:
-    id=IDENT { Ident id }
-  | cid=CAPID { CapId id }
+module_binding:
+    cid=CAPID { LeafModule cid }
+  | m=module_binding "." cid=CAPID { SubModule (m, cid) }
 
 unit:
     "(" ")" { Unit }
@@ -413,27 +461,23 @@ item_list:
 record:
     "{" "}" { Record [] }
   | "{" l=field_list "}" { Record l }
-  | "{" l=field_list "," "}" { Record l }
 
 field_list:
     f=field_binding { [f] }
+  | f=field_binding "," { [f] }
   | f=field_binding "," l=field_list { f :: l }
 
 field_binding:
     id=IDENT "=" e=expr { (id, e) }
 
 call:
-    caller=expr e=highest_prec { Call (caller, e) }
+    caller=caller e=highest_prec { Call (caller, e) }
+
+caller:
+    e=highest_prec { e }
+  | e=call { e }
 
 construction:
     cid=CAPID e=highest_prec { Construct (cid, e) }
-
-highest_prec:
-    e=terminal { e }
-  | "(" e=expr_list ")" { e }
-
-expr_list:
-    e=expr { e }
-  | a=expr ";" b=expr_list { ManyExpr (a, b) }
 
 %%

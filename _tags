@@ -1,1 +1,1 @@
-<*.mly>: use_menhir
+true: use_menhir
