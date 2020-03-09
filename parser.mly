@@ -43,8 +43,8 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
 %token SEMICOLON ";" COLON ":" COMMA "," PERIOD "."
 %token ASSIGN ":=" ASSIGNFIELD "<-"
 
-%start program
-%type <Ast.decl list> program
+%start main
+%type <Ast.decl list> main
 %type <Ast.decl> global_decl
 %type <Ast.expr> expr
 
@@ -56,7 +56,7 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
 
 %%
 
-program:
+main:
     l=global_decl_list EOF { l }
 
 global_decl_list:
@@ -64,9 +64,9 @@ global_decl_list:
   | g=global_decl l=global_decl_list { g :: l }
 
 global_decl:
-    decl = let_decl { ValueBinding decl }
-  | decl = method_decl { MethodBinding decl }
-  | decl = type_decl { TypeBinding decl }
+    decl=let_decl { ValueBinding decl }
+  | decl=method_decl { MethodBinding decl }
+  | decl=type_decl { TypeBinding decl }
 
 let_decl:
     "let" r=is_rec b=let_binding
@@ -127,7 +127,8 @@ type_binding_list:
   | b=type_binding "and" l=type_binding_list { b :: l }
 
 type_binding:
-    p=type_param id=IDENT "=" t=type_construct { (p, id, t) }
+    id=IDENT "=" t=type_construct { (None, id, t) }
+  | p=type_param id=IDENT "=" t=type_construct { (Some p, id, t) }
 
 type_param:
     t=type_symbol { [t] }
@@ -138,7 +139,7 @@ type_symbol_list:
   | t=type_symbol "," l=type_symbol_list { t :: l }
 
 type_symbol:
-    s=TYPESYMBOL { TypeSymbol s }
+    s=TYPESYMBOL { s }
 
 type_construct:
     t=type_expr { TypeExpr t }
@@ -168,7 +169,7 @@ field_type_list:
   | t=field_type "," l=field_type_list { t :: l }
 
 field_type:
-    m=is_mutable id=IDENT "=" t=type_expr { (m, id, t) }
+    m=is_mutable id=IDENT ":" t=type_expr { (m, id, t) }
 
 is_mutable:
     { false }
@@ -205,9 +206,8 @@ type_tuple_list:
   | t=inner_type_expr "*" l=type_tuple_list { t :: l }
 
 inner_type_expr:
-    t=type_terminal { t }
+    t=highest_prec_type_expr { t }
   | t=type_specialization { t }
-  | "(" t=type_expr ")" { t }
 
 highest_prec_type_expr:
     t=type_terminal { t }
@@ -218,7 +218,7 @@ type_specialization:
 
 type_terminal:
     id=IDENT { SingleType (TypeName id) }
-  | t=type_symbol { SingleType t }
+  | t=type_symbol { SingleType (TypeSymbol t) }
 
 expr:
     e=local_expr { e }
@@ -226,7 +226,6 @@ expr:
   | e=match_expr { e }
   | e=lambda_expr { e }
   | e=infix_op { e }
-  | "(" e=expr ":" t=type_expr ")" { ExprWithType (e, t) }
 
 local_expr:
     d=let_decl "in" e=expr { Local (d, e) }
@@ -259,14 +258,17 @@ function_expr:
 
 pattern:
     p=single_pattern { p }
-  | a=single_pattern "|" b=pattern { ManyPattern (a, b) }
+  | p=mutli_pattern { p }
+
+mutli_pattern:
+    p=single_pattern "|" l=single_pattern_list { PatternList (p::l) }
+
+single_pattern_list:
+    p=single_pattern { [p] }
+  | p=single_pattern "|" l=single_pattern_list { p :: l }
 
 single_pattern:
     p=pattern_infix { p }
-  | p=pattern_with_type { p }
-
-pattern_with_type:
-    "(" p=pattern ":" t=type_expr ")" { PatternWithType (p, t) }
 
 pattern_infix:
     p=pattern_infix_cons { p }
@@ -276,13 +278,19 @@ pattern_infix_cons:
   | hd=inner_pattern "::" tl=pattern_infix_cons { ConsPattern (hd, tl) }
 
 inner_pattern:
-    p=pattern_terminal { p }
-  | p=variant_pattern { p }
-  | "(" p=pattern ")" { p }
+    p=highest_prec_pattern { p }
+  | p=variant_with_value_pattern { p }
 
 highest_prec_pattern:
     p=pattern_terminal { p }
-  | "(" p=pattern ")" { p }
+  | p=nested_pattern { p }
+  | p=pattern_with_type { p }
+
+pattern_with_type:
+    "(" p=pattern ":" t=type_expr ")" { PatternWithType (p, t) }
+
+nested_pattern:
+    "(" p=pattern ")" { p }
 
 pattern_terminal:
     p=pattern_literal { p }
@@ -292,6 +300,7 @@ pattern_terminal:
   | p=array_pattern { p }
   | p=record_pattern { p }
   | p=variable_pattern { p }
+  | p=variant_pattern { p }
 
 pattern_literal:
     b=BOOL { BoolPattern b }
@@ -336,7 +345,9 @@ variable_pattern:
 
 variant_pattern:
     cid=CAPID { VariantPattern (cid, None) }
-  | cid=CAPID p=pattern_terminal { VariantPattern (cid, Some p) }
+
+variant_with_value_pattern:
+    cid=CAPID p=pattern_terminal { VariantPattern (cid, Some p) }
   | cid=CAPID "(" p=pattern ")" { VariantPattern (cid, Some p) }
 
 infix_op:
@@ -410,18 +421,29 @@ inner_expr:
 
 highest_prec:
     e=terminal { e }
-  | "(" e=expr_list ")" { e }
+  | e=nested_expr { e }
+  | e=expr_with_type { e }
+
+nested_expr:
+    "(" e=expr_or_expr_list ")" { e }
+
+expr_with_type:
+    "(" e=expr ":" t=type_expr ")" { ExprWithType (e, t) }
+
+expr_or_expr_list:
+    e=expr { e }
+  | e=expr ";" l=expr_list { ExprList (e::l) }
 
 expr_list:
-    e=expr { e }
-  | a=expr ";" b=expr_list { ManyExpr (a, b) }
+    e=expr { [e] }
+  | e=expr ";" l=expr_list { e :: l }
 
 terminal:
     e=literal { e }
   | e=binding { e }
   | e=unit { e }
   | e=tuple { e }
-  | e=list { e }
+  | e=list_value { e }
   | e=array { e }
   | e=record { e }
 
@@ -446,7 +468,7 @@ unit:
 tuple:
     "(" e=expr "," l=item_list ")" { Tuple (e :: l) }
 
-list:
+list_value:
     "[" "]" { List [] }
   | "[" l=item_list "]" { List l }
 

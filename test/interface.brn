@@ -1,0 +1,11 @@
+type error = interface
+    error_message : unit -> string
+end
+
+type reader = interface
+    read : buffer -> (unit * error) result
+end
+
+type writer = interface
+    write : buffer -> (unit * error) result
+end

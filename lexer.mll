@@ -6,7 +6,8 @@ let string_of_chars list =
   String.concat "" (List.map (String.make 1) list)
 }
 
-let space = [' ' '\t' '\n' '\r']
+let eol = '\n'
+let space = [' ' '\t' '\r']
 let digit = ['0'-'9']
 let alpha = ['a'-'z' 'A'-'Z']
 let lowercase = ['a'-'z']
@@ -14,13 +15,10 @@ let uppercase = ['A'-'Z']
 let alnum = digit | alpha | '_'
 
 rule lex = parse
-    space       { lex lexbuf }
+    eol         { Lexing.new_line lexbuf; lex lexbuf }
+  | space       { lex lexbuf }
   | "true"      { BOOL true }
   | "false"     { BOOL false }
-  | digit+ as lxm { INT (int_of_string lxm) }
-  | "_"         { WILDCARD }
-  | lowercase alnum* as lxm { IDENT lxm }
-  | uppercase alnum* as lxm { CAPID lxm }
   | "'"         { lex_quote lexbuf }
   | "#'"        { lex_char [] lexbuf }
   | "\""        { lex_string [] lexbuf }
@@ -76,15 +74,22 @@ rule lex = parse
   | ":="  { ASSIGN }
   | "<-"  { ASSIGNFIELD }
   | "(*"  { lex_comment lexbuf; lex lexbuf }
+  | "_"         { WILDCARD }
+  | digit+ as lxm { INT (int_of_string lxm) }
+  | lowercase alnum* as lxm { IDENT lxm }
+  | uppercase alnum* as lxm { CAPID lxm }
   | eof   { EOF }
 
 and lex_comment = parse
     "*)" {}
   | "(*" { lex_comment lexbuf; lex_comment lexbuf }
+  | eol  { Lexing.new_line lexbuf; lex_comment lexbuf }
   | _    { lex_comment lexbuf }
 
 and lex_quote = parse
-    alpha alnum* as lxm { TYPESYMBOL lxm }
+    eol   { Lexing.new_line lexbuf; lex_quote lexbuf }
+  | space { lex_quote lexbuf }
+  | alpha alnum* as lxm { TYPESYMBOL lxm }
 
 and lex_char acc = parse
     "\'" {
@@ -98,6 +103,7 @@ and lex_char acc = parse
   | "\\\"" { lex_char ('\"'::acc) lexbuf }
   | "\\\'" { lex_char ('\''::acc) lexbuf }
   | "\\\\" { lex_char ('\\'::acc) lexbuf }
+  | eol    { Lexing.new_line lexbuf; lex_char ('\n'::acc) lexbuf }
   | _ as c { lex_char (c :: acc) lexbuf }
 
 and lex_string acc = parse
@@ -108,4 +114,5 @@ and lex_string acc = parse
   | "\\\"" { lex_string ('\"'::acc) lexbuf }
   | "\\\'" { lex_string ('\''::acc) lexbuf }
   | "\\\\" { lex_string ('\\'::acc) lexbuf }
+  | eol    { Lexing.new_line lexbuf; lex_string ('\n'::acc) lexbuf }
   | _ as c { lex_string (c :: acc) lexbuf }

@@ -1,0 +1,12 @@
+
+let rev l =
+  let rec aux acc = function
+    | [] => acc
+    | h :: t => aux (h :: acc) t
+  in aux l
+
+let map f l =
+  let rec iter acc = function
+    | [] => acc
+    | h :: t => iter (f h :: acc) t
+  in rev (iter [] l)

@@ -1,0 +1,12 @@
+type book = {
+    name : string,
+    author : string,
+    mutable content : string,
+}
+
+method (b : book) get_name () = b.book
+and get_author () = b.author
+and get_intro () = b.get_name () ^ b.get_author ()
+
+method (b : book) get_content () = b.content
+and set_content new_content = b.content <- new_content

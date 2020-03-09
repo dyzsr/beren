@@ -5,8 +5,8 @@ let token_to_string =
   | BOOL b -> string_of_bool b
   | CHAR c -> "'" ^ String.make 1 c ^ "'"
   | STRING s -> "\"" ^ s ^ "\""
-  | IDENT id -> id
-  | CAPID id -> id
+  | IDENT id -> "id<" ^ id ^ ">"
+  | CAPID id -> "id<" ^ id ^ ">"
   | TYPESYMBOL s -> "'" ^ s
   | EOF -> "EOF"
   | LET -> "let"
@@ -66,28 +66,39 @@ let lexer lexbuf =
   let () = print_endline ("token: " ^ token_to_string tok) in
   tok
 
+let pos_to_string Lexing.{pos_lnum=lnum; pos_bol=bol; pos_cnum=cnum} =
+  let lstr = "line " ^ string_of_int lnum in
+  let cstr = "column " ^ string_of_int (cnum - bol) in
+  lstr ^ ", " ^ cstr
+
+let read_token_until_eof lexer lexbuf =
+  let rec aux = function
+  | Parser.EOF -> ()
+  | v -> aux (lexer lexbuf)
+  in aux (lexer lexbuf)
+
+exception SyntaxError of string
+
+let parse lexer lexbuf = 
+  try
+    Parser.main lexer lexbuf
+  with Parser.Error ->
+    let token = Lexing.lexeme lexbuf in
+    let start_p  = pos_to_string (Lexing.lexeme_start_p lexbuf) in
+    let error_string = start_p ^ ": Syntax error at token '" ^ token ^ "'" in
+    raise (SyntaxError error_string)
+
 let _ = 
   match Array.length Sys.argv with
   | 1 -> failwith "no input file"
   | n ->
     let file = Sys.argv.(1) in
-    let () = print_endline file in
-    let chan = open_in Sys.argv.(1) in
+    (* let () = print_endline file in *)
+    let chan = open_in file in
     let lexbuf = Lexing.from_channel chan in
-    let rec aux = function
-    | Parser.EOF -> ()
-    | v -> print_endline (token_to_string v); aux (Lexer.lex lexbuf)
-    in aux (Lexer.lex lexbuf)
-    (* try
-      let result = Parser.program lexer lexbuf in
-      print_newline (); flush stdout
-    with Parser.Error ->
-      let pos_to_string Lexing.{pos_lnum=lnum; pos_cnum=cnum} =
-        let lstr = "line " ^ string_of_int lnum in
-        let cstr = "col " ^ string_of_int cnum in
-        "[" ^ lstr ^ ", " ^ cstr ^ "]"
-      in
-      let start_p = Lexing.lexeme_start_p lexbuf in
-      let end_p = Lexing.lexeme_end_p lexbuf in
-      print_endline ("Syntax error between "
-        ^ pos_to_string start_p ^ " and " ^ pos_to_string end_p) *)
+    (* read_token_until_eof lexer lexbuf *)
+    try
+      let result = parse lexer lexbuf in
+      let print decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
+      List.iter print result
+    with SyntaxError s -> print_endline s

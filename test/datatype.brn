@@ -1,0 +1,24 @@
+type 'a option = None | Some of 'a
+
+type ('a, 'b) result =
+  | Ok of 'a
+  | Error of 'b
+
+type 'a ref = { mutable contents : 'a }
+
+let ref (x : 'a) = { contents=x }
+let ref (x : 'a) : 'a ref = { contents=x }
+
+type 'a list =
+  | Nil
+  | Cons of 'a * 'a list
+
+let rec length = function
+  | Nil => 0
+  | Cons (_, t) => 1 + length t
+
+let length l =
+  let rec aux acc = function
+    | Nil => acc
+    | Cons (_, t) => aux (acc + 1) t
+  in aux 0 l
