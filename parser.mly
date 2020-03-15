@@ -64,9 +64,9 @@ global_decl_list:
   | g=global_decl l=global_decl_list { g :: l }
 
 global_decl:
-    decl=let_decl { ValueBinding decl }
-  | decl=method_decl { MethodBinding decl }
-  | decl=type_decl { TypeBinding decl }
+    decl=let_decl { ValueBindings decl }
+  | decl=method_decl { MethodBindings decl }
+  | decl=type_decl { TypeBindings decl }
 
 let_decl:
     "let" r=is_rec b=let_binding
@@ -96,17 +96,20 @@ fun_binding:
       { (VariablePattern id, val_of_fun e proto) }
 
 method_decl:
-    "method" r=receiver b=fun_binding
-      { (r, (true, [b])) }
-  | "method" r=receiver b=fun_binding "and" l=method_binding_list
-      { (r, (true, b::l)) }
+    "method" b=method_binding
+      { (true, [b]) }
+  | "method" b=method_binding "and" l=method_binding_list
+      { (true, b::l) }
+
+method_binding:
+    r=receiver b=fun_binding { (r, b) }
 
 receiver:
     p=pattern_with_type { p }
 
 method_binding_list:
-    b=fun_binding { [b] }
-  | b=fun_binding "and" l=method_binding_list { b :: l }
+    b=method_binding { [b] }
+  | b=method_binding "and" l=method_binding_list { b :: l }
 
 prototype:
     l=arg_list { Prototype (l, None) }
@@ -143,13 +146,13 @@ type_symbol:
 
 type_construct:
     t=type_expr { TypeExpr t }
-  | t=variant_type { t }
+  | t=variants_type { t }
   | t=record_type { t }
   | t=interface_type { t }
 
-variant_type:
-    l=variant_list { VariantType l }
-  | "|" l=variant_list { VariantType l }
+variants_type:
+    l=variant_list { VariantsType l }
+  | "|" l=variant_list { VariantsType l }
 
 variant_list:
     t=variant { [t] }
@@ -214,7 +217,7 @@ highest_prec_type_expr:
   | "(" t=type_expr ")" { t }
 
 type_specialization:
-    t=highest_prec_type_expr id=IDENT { SpecializedType (t, id) }
+    t=highest_prec_type_expr id=IDENT { SpecificType (t, id) }
 
 type_terminal:
     id=IDENT { SingleType (TypeName id) }
@@ -344,11 +347,11 @@ variable_pattern:
   | WILDCARD { Wildcard }
 
 variant_pattern:
-    cid=CAPID { VariantPattern (cid, None) }
+    cid=CAPID { VariantsPattern (cid, None) }
 
 variant_with_value_pattern:
-    cid=CAPID p=pattern_terminal { VariantPattern (cid, Some p) }
-  | cid=CAPID "(" p=pattern ")" { VariantPattern (cid, Some p) }
+    cid=CAPID p=pattern_terminal { VariantsPattern (cid, Some p) }
+  | cid=CAPID "(" p=pattern ")" { VariantsPattern (cid, Some p) }
 
 infix_op:
     e=infix_assign { e }

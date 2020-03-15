@@ -22,3 +22,11 @@ let length l =
     | Nil => acc
     | Cons (_, t) => aux (acc + 1) t
   in aux 0 l
+
+type int_list = int list
+
+type nat =
+  | O
+  | S of nat
+
+type 'b t = 'b option

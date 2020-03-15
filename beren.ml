@@ -99,6 +99,8 @@ let _ =
     (* read_token_until_eof lexer lexbuf *)
     try
       let result = parse lexer lexbuf in
-      let print decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
-      List.iter print result
+      let print_ast decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
+      let () = List.iter print_ast result in
+      let _ = Types.walk_decl_list result in
+      ()
     with SyntaxError s -> print_endline s

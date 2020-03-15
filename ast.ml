@@ -1,17 +1,17 @@
 (* AST definitions *)
 type decl =
-  | TypeBinding of type_binding
-  | ValueBinding of value_binding
-  | MethodBinding of method_binding
+  | TypeBindings of type_bindings
+  | ValueBindings of value_bindings
+  | MethodBindings of method_bindings
 
-and type_binding = 
-  bool (* recursive *) * (type_param option * string (* id *) * type_construct) list
+and type_bindings = bool (* recursive *) * type_binding list
+and type_binding = type_param option * string (* id *) * type_construct
 
 and type_param = string list
 
 and type_construct =
   | TypeExpr of type_expr
-  | VariantType of variant_type
+  | VariantsType of variants_type
   | RecordType of record_type
   | InterfaceType of interface_type
 
@@ -19,19 +19,22 @@ and type_expr =
   | SingleType of type_name
   | TupleType of type_expr list
   | FunctionType of type_expr * type_expr
-  | SpecializedType of type_expr * string
-
-and variant_type = (string (* constructor *) * type_expr option) list
-and record_type = (bool (* mutable *) * string (* id *) * type_expr) list
-and interface_type = (string (* id *) * type_expr (* function type *) ) list
+  | SpecificType of type_expr * string
 
 and type_name =
   | TypeSymbol of string
   | TypeName of string
 
-and value_binding = bool (* recursive *) * (pattern * expr) list
+and variants_type = (string (* constructor *) * type_expr option) list
+and record_type = (bool (* mutable *) * string (* id *) * type_expr) list
+and interface_type = (string (* id *) * type_expr (* function type *) ) list
 
-and method_binding = pattern (* receiver *) * value_binding
+and value_bindings = bool (* recursive *) * value_binding list
+and value_binding = pattern * expr
+
+and method_bindings = bool * method_binding list
+
+and method_binding = pattern (* receiver *) * (pattern * expr)
 
 and pattern =
   | BoolPattern of bool
@@ -46,7 +49,7 @@ and pattern =
   | RecordPattern of record_pattern (* {?=?, ...} *)
   | VariablePattern of string (* id *)
   | Wildcard
-  | VariantPattern of string (* constructor *) * pattern option (* value *)
+  | VariantsPattern of string (* constructor *) * pattern option (* value *)
   | PatternList of pattern list
   | PatternWithType of pattern * type_expr
 
@@ -69,7 +72,7 @@ and expr =
   | Construct of string * expr
   | Unary of unary_op * expr
   | Binary of binary_op * expr * expr
-  | Local of value_binding * expr
+  | Local of value_bindings * expr
   | IfExpr of if_expr
   | MatchExpr of match_expr
   | LambdaExpr of lambda_expr
@@ -119,11 +122,11 @@ let rep_to_string rep =
   in aux "" rep
 
 let rec decl_to_rep = function
-  | TypeBinding b -> type_binding_to_rep b
-  | ValueBinding b -> value_binding_to_rep b
-  | MethodBinding b -> method_binding_to_rep b
+  | TypeBindings b -> type_bindings_to_rep b
+  | ValueBindings b -> value_bindings_to_rep b
+  | MethodBindings b -> method_bindings_to_rep b
 
-and type_binding_to_rep ((r, l) : type_binding) =
+and type_bindings_to_rep ((r, l) : type_bindings) =
   let binding_to_rep (params_opt, id, construct) =
     match params_opt with
     | None -> 
@@ -150,7 +153,7 @@ and type_params_to_rep = function
 
 and type_construct_to_rep = function
   | TypeExpr t -> type_expr_to_rep t
-  | VariantType t -> variant_type_to_rep t
+  | VariantsType t -> variant_type_to_rep t
   | RecordType t -> record_type_to_rep t
   | InterfaceType t -> interface_type_to_rep t
 
@@ -161,14 +164,14 @@ and type_expr_to_rep = function
     ManyLines ("tuple-type", List.map type_expr_to_rep l)
   | FunctionType (param, res) ->
     ManyLines ("function-type", [type_expr_to_rep param; type_expr_to_rep res])
-  | SpecializedType (arg, name) ->
-    ManyLines ("specialized-type", [type_expr_to_rep arg; OneLine ("generics-type", name)])
+  | SpecificType (arg, name) ->
+    ManyLines ("specific-type", [type_expr_to_rep arg; OneLine ("generics-type", name)])
 
 and variant_type_to_rep l =
   let aux = function
     | (name, None) -> OneLine ("variant", name)
     | (name, Some typ) -> ManyLines ("variant", [OneLine ("constructor", name); type_expr_to_rep typ])
-  in ManyLines ("variant-type", List.map aux l)
+  in ManyLines ("variants-type", List.map aux l)
 
 and record_type_to_rep l =
   let aux (mut, name, typ) =
@@ -177,10 +180,10 @@ and record_type_to_rep l =
 
 and interface_type_to_rep l =
   let aux (name, typ) =
-    ManyLines ("method", [OneLine ("name", name); type_expr_to_rep typ])
+    ManyLines ("signature", [OneLine ("name", name); type_expr_to_rep typ])
   in ManyLines ("interface-type", List.map aux l)
 
-and value_binding_to_rep ((r, l) : value_binding) =
+and value_bindings_to_rep ((r, l) : value_bindings) =
   let binding_to_rep (pattern, expr) =
     let pattern_rep = pattern_to_rep pattern in
     let expr_rep = expr_to_rep expr in
@@ -190,9 +193,16 @@ and value_binding_to_rep ((r, l) : value_binding) =
   let bindings = List.map binding_to_rep l in
   ManyLines (name, bindings)
 
-and method_binding_to_rep (p, (r, l) : method_binding) =
-  let binding_rep = value_binding_to_rep (r, l) in
-  ManyLines ("method", [pattern_to_rep p; binding_rep])
+and method_bindings_to_rep ((r, l) : method_bindings) =
+  let binding_to_rep (receiver, (pattern, expr)) = 
+    let receiver_rep = pattern_to_rep receiver in
+    let pattern_rep = pattern_to_rep pattern in
+    let expr_rep = expr_to_rep expr in
+    ManyLines ("binding", [receiver_rep; pattern_rep; expr_rep])
+  in
+  let name = "method " ^ if r then "rec" else "nonrec" in
+  let bindings = List.map binding_to_rep l in
+  ManyLines (name, bindings)
 
 and pattern_to_rep = function
   | BoolPattern b -> OneLine ("bool-pattern", string_of_bool b)
@@ -207,7 +217,7 @@ and pattern_to_rep = function
   | RecordPattern p -> record_pattern_to_rep p (* {?=?, ...} *)
   | VariablePattern v -> OneLine ("variable-pattern", v) (* id *)
   | Wildcard -> OneLine ("wildcard", "_")
-  | VariantPattern (name, pat_opt) -> begin
+  | VariantsPattern (name, pat_opt) -> begin
     match pat_opt with
       | None -> OneLine ("variant-pattern", name)
       | Some p -> ManyLines ("variant-pattern", [OneLine ("name", name); pattern_to_rep p])
@@ -238,7 +248,7 @@ and expr_to_rep = function
   | Construct (name, e) -> ManyLines ("construct", [OneLine ("constructor", name); expr_to_rep e])
   | Unary (op, e) -> unary_op_to_rep (op, e)
   | Binary (op, a, b) -> binary_op_to_rep (op, a, b)
-  | Local (b, e) -> ManyLines ("local", [value_binding_to_rep b; expr_to_rep e])
+  | Local (b, e) -> ManyLines ("local", [value_bindings_to_rep b; expr_to_rep e])
   | IfExpr e -> if_expr_to_rep e
   | MatchExpr e -> match_expr_to_rep e
   | LambdaExpr e -> lambda_expr_to_rep e
