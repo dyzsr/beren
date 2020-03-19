@@ -28,7 +28,6 @@ rule lex = parse
   | "and"       { AND }
   | "rec"       { REC }
   | "in"        { IN }
-  | "mutable"   { MUTABLE }
   | "of"        { OF }
   | "fun"       { FUN }
   | "function"  { FUNCTION }
@@ -37,7 +36,7 @@ rule lex = parse
   | "else"      { ELSE }
   | "match"     { MATCH }
   | "with"      { WITH }
-  | "interface" { INTERFACE }
+  | "sig"       { SIG }
   | "end"       { END }
   | "+"   { PLUS }
   | "-"   { MINUS }
@@ -72,7 +71,6 @@ rule lex = parse
   | ","   { COMMA }
   | "."   { PERIOD }
   | ":="  { ASSIGN }
-  | "<-"  { ASSIGNFIELD }
   | "(*"  { lex_comment lexbuf; lex lexbuf }
   | "_"         { WILDCARD }
   | digit+ as lxm { INT (int_of_string lxm) }

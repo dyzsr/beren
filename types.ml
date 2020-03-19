@@ -1,13 +1,25 @@
+type id = int
+
+let init_id = ref 0
+
+let current_id () =
+  !init_id
+
+let new_id () = 
+  let id = !init_id in init_id := id + 1; id
+
 type datatype =
   | Unit
   | Bool
   | Int
   | Char
   | String
+  | Ref
+  | Array
   | Param of param
   | Tuple of datatype list
-  | Variants of variant list (* variants *)
-  | Record of field list (* fields *)
+  | Variants of id * variant list (* variants *)
+  | Record of id * field list (* fields *)
   | Interface of signature list
   | Function of datatype * datatype
   | Generic of param list * datatype
@@ -17,7 +29,7 @@ type datatype =
 
 and param = string
 and variant = string * datatype ref option
-and field = bool (* mutable *) * string (* name *) * datatype ref
+and field = string (* name *) * datatype ref
 and signature = string * datatype ref
 
 let make_param name = Param name
@@ -30,7 +42,11 @@ let rec string_of_toplevel_datatype = function
     | l -> let params = List.map (fun x -> "'" ^ x) l in
       "(" ^ String.concat ", " params ^ ")"
     in
-    "type " ^ string_of_params params ^ " " ^ name ^ " = " ^ string_of_datatype typ
+    let params_string = string_of_params params in
+    (match typ with
+     | Ref -> "type " ^ params_string ^ " ref"
+     | Array -> "type " ^ params_string ^ " array"
+     | _ -> "type " ^ params_string ^ " " ^ name ^ " = " ^ string_of_datatype typ)
   | Alias (name, typ) ->
       "type " ^ name ^ " = " ^ string_of_datatype typ
   | t -> "type _ = " ^ string_of_datatype t
@@ -41,28 +57,29 @@ and string_of_datatype = function
   | Int -> "int"
   | Char -> "char"
   | String -> "string"
+  | Ref -> failwith "string_of_datatype: ref"
+  | Array -> failwith "string_of_datatype: array"
   | Param p -> "'" ^ p
   | Tuple l -> String.concat " * " (List.map string_of_datatype l)
-  | Variants l ->
+  | Variants (_, l) ->
     let string_of_variant = function
     | (name, None) -> name
     | (name, Some typ) -> name ^ " of " ^ string_of_datatype (!typ)
     in
     String.concat " | " (List.map string_of_variant l)
-  | Record l ->
-    let string_of_field = function
-    | (false, name, typ) -> name ^ " : " ^ string_of_datatype (!typ)
-    | (true, name, typ) -> "mutable " ^ name ^ " : " ^ string_of_datatype (!typ)
+  | Record (_, l) ->
+    let string_of_field (name, typ) =
+      name ^ " : " ^ string_of_datatype (!typ)
     in
-    "{ " ^ String.concat ", " (List.map string_of_field l) ^ " }"
+    "{ " ^ String.concat "; " (List.map string_of_field l) ^ " }"
   | Interface l ->
     let string_of_signature (name, typ) =
       name ^ " : " ^ string_of_datatype (!typ)
     in
-    "interface " ^ String.concat ", " (List.map string_of_signature l) ^ " end"
+    "sig " ^ String.concat "; " (List.map string_of_signature l) ^ " end"
   | Function (arg, body) ->
     string_of_datatype arg ^ " -> " ^ string_of_datatype body
-  | Generic (params, body) -> failwith "string of datatype"
+  | Generic (params, body) -> failwith "string_of_datatype: generic"
   | Specific (arg, body) ->
     string_of_datatype arg ^ " " ^ string_of_datatype body
   | Alias (name, _) -> name
@@ -75,18 +92,6 @@ type typtab = {
   constructors : variant Scope.t;
   fields : field Scope.t;
 }
-
-let default_typtab =
-  let default_types = Scope.make
-    [ ("unit", Unit);
-      ("bool", Bool);
-      ("int", Int);
-      ("char", Char);
-      ("string", String); ]
-  in { types = default_types;
-       symbols = Scope.empty ();
-       constructors = Scope.empty ();
-       fields = Scope.empty (); }
 
 exception Unbound_type of string
 
@@ -120,6 +125,8 @@ let rec update_pending typtab = function
   | Int -> Int
   | Char -> Char
   | String -> String
+  | Ref -> Ref
+  | Array -> Array
   | Param _ as t -> t
   | Tuple l -> Tuple (List.map (update_pending typtab) l)
   | Variants _ as t -> t
@@ -138,21 +145,23 @@ let rec resolve_pending typtab = function
   | Int -> ()
   | Char -> ()
   | String -> ()
+  | Ref -> ()
+  | Array -> ()
   | Param _ -> ()
   | Tuple l -> List.iter (resolve_pending typtab) l
-  | Variants l ->
+  | Variants (_, l) ->
     let (resolve_variant : variant -> unit) = function
     | (_, None) -> ()
     | (_, Some typ) -> typ := update_pending typtab (!typ)
     in
     List.iter resolve_variant l
-  | Record l ->
-    let resolve_field ((_, _, typ) : field) =
+  | Record (_, l) ->
+    let resolve_field (_, typ : field) =
       typ := update_pending typtab (!typ)
     in
     List.iter resolve_field l
   | Interface l ->
-    let resolve_signature ((_, typ) : signature) =
+    let resolve_signature (_, typ : signature) =
       typ := update_pending typtab (!typ)
     in
     List.iter resolve_signature l
@@ -169,6 +178,8 @@ let rec filter_pending = function
   | Int -> false
   | Char -> false
   | String -> false
+  | Ref -> false
+  | Array -> false
   | Param _ -> false
   | Tuple l ->
     let rec iter = function
@@ -198,25 +209,60 @@ let rec check_datatype = function
   | Int -> ()
   | Char -> ()
   | String -> ()
+  | Ref -> failwith "check_datatype: ref"
+  | Array -> failwith "check_datatype: array"
   | Param _ -> ()
   | Tuple l -> List.iter check_datatype l
-  | Variants l -> let aux = function
+  | Variants (_, l) -> let aux = function
     | (_, None) -> ()
     | (_, Some t) -> check_datatype (!t)
     in
     List.iter aux l
-  | Record l -> List.iter (fun (_, _, t) -> check_datatype (!t)) l
+  | Record (_, l) -> List.iter (fun (_, t) -> check_datatype (!t)) l
   | Interface l -> List.iter (fun (_, t) -> check_datatype (!t)) l
   | Function (arg, body) -> check_datatype arg; check_datatype body
+  | Generic (_, Ref) -> ()
+  | Generic (_, Array) -> ()
   | Generic (_, body) -> check_datatype body
   | Specific (arg, body) -> check_datatype arg;
     (match body with
       | Alias (name, Generic _) -> ()
       | Alias (name, _) -> raise (Type_arity_mismatch name)
-      | _ -> failwith "check datatype: specific")
+      | _ -> failwith "check_datatype: specific")
   | Alias (_, Alias (name, Generic _)) -> raise (Type_arity_mismatch name)
   | Alias _ -> ()
-  | Pending _ -> failwith "check datatype: pending"
+  | Pending _ -> failwith "check_datatype: pending"
+
+(* Default types for access *)
+let default_typtab =
+  let list_type =
+    let ref_type = ref (Tuple [Param "a"; Specific (Param "a", Pending "list")]) in
+    let variants = Variants (new_id (),
+      [("[]", None);
+       ("(::)", Some ref_type)]) in
+    let alias = Alias ("list", Generic(["a"], variants)) in
+    ref_type := Tuple [Param "a"; Specific (Param "a", alias)];
+    alias
+  in
+  let ref_type = Alias ("ref", Generic (["a"], Ref)) in
+  let array_type = Alias ("array", Generic (["a"], Array)) in
+  let default_type_list =
+    [("unit", Alias ("unit", Unit));
+     ("bool", Alias ("bool", Bool));
+     ("int", Alias ("int", Int));
+     ("char", Alias ("char", Char));
+     ("string", Alias ("string", String));
+     ("list", list_type);
+     ("ref", ref_type);
+     ("array", array_type)]
+  in
+  let default_types = Scope.make default_type_list in
+  let print (_, typ) = print_endline (string_of_toplevel_datatype typ) in
+  let () = List.iter print default_type_list in
+  { types = default_types;
+    symbols = Scope.empty ();
+    constructors = Scope.empty ();
+    fields = Scope.empty (); }
 
 
 (* Walk the AST to perform type inference and checking *)
@@ -311,12 +357,12 @@ and datatype_of_variants_type typtab (l : Ast.variants_type) =
   | (name, None) -> (name, None)
   | (name, Some expr) -> (name, Some (ref (datatype_of_type_expr typtab expr)))
   in
-  Variants (List.map from_variant l)
+  Variants (new_id (), (List.map from_variant l))
 
 and datatype_of_record_type typtab (l : Ast.record_type) =
   (* let () = print_endline ("from record type") in *)
-  let from_field (mut, name, expr) = (mut, name, ref (datatype_of_type_expr typtab expr)) in
-  Record (List.map from_field l)
+  let from_field (name, expr) = (name, ref (datatype_of_type_expr typtab expr)) in
+  Record (new_id (), (List.map from_field l))
 
 and datatype_of_interface_type typtab (l : Ast.interface_type) =
   (* let () = print_endline ("from interface type") in *)
@@ -324,11 +370,99 @@ and datatype_of_interface_type typtab (l : Ast.interface_type) =
   Interface (List.map from_method l)
 
 
+(* Match destination type with source type in a value binding *)
+exception Type_mismatch
+
+let rec agree_on_type typtab dest src =
+  match dest, src with
+  | Alias (name, d), s -> Alias (name, agree_on_type typtab d s)
+  | d, Alias (name, s) -> agree_on_type typtab d s
+  | Unit, Unit -> Unit
+  | Bool, Bool -> Bool
+  | Int, Int -> Int
+  | Char, Char -> Char
+  | String, String -> String
+  | Ref, Ref -> Ref
+  | Array, Array -> Array
+  | d, Param _ -> d
+  | Param _, s -> s
+  | Tuple d, Tuple s -> agree_on_tuple typtab d s
+  | Variants (did, d), Variants (sid, s) -> agree_on_variants typtab (did, d) (sid, s)
+  | Record (did, d), Record (sid, s) -> agree_on_record typtab (did, d) (sid, s)
+  | Interface d, s -> agree_on_interface typtab d s
+  | Function (darg, dbody), Function (sarg, sbody) -> agree_on_function typtab (darg, dbody) (sarg, sbody)
+  | Specific (darg, dbody), Specific (sarg, sbody) -> agree_on_specific typtab (darg, dbody) (sarg, sbody)
+  | _ -> failwith "agree_on_type"
+
+and agree_on_tuple typtab dest src =
+  Tuple (agree_on_constraints typtab (List.combine dest src))
+
+and agree_on_variants typtab (did, dest) (sid, src) =
+  if did = sid then Variants (did, dest)
+  else raise Type_mismatch
+
+and agree_on_record typtab (did, dest) (sid, src) =
+  if did = sid then Record (did, dest)
+  else raise Type_mismatch
+
+and agree_on_interface typtab dest src =
+  failwith "agree_on_interface"
+
+and agree_on_function typtab (darg, dbody) (sarg, sbody) =
+  match agree_on_constraints typtab [(darg, sarg); (dbody, sbody)] with
+  | [arg; body] -> Function (arg, body)
+  | _ -> failwith "agree_on_function"
+
+and agree_on_specific typtab (darg, dbody) (sarg, sbody) =
+  failwith "agree_on_specific"
+
+and agree_on_constraints typtab l =
+  failwith "agree_on_constraints"
+
+
+(* Make built-in types *)
+let make_list_type (l : Ast.expr list) =
+  failwith "make_list_type"
+
+let make_array_type (l : Ast.expr list) =
+  failwith "make_array_type"
+
 let rec walk_value_bindings typtab (r, l) =
   typtab
 
 and datatype_of_value_binding typtab ((pattern, expr) : Ast.value_binding) =
   Unit
+
+and datatype_of_expr typtab = function
+  | Ast.Unit -> Unit
+  | Ast.Bool _ -> Bool
+  | Ast.Int _ -> Int
+  | Ast.Char _ -> Char
+  | Ast.String _ -> String
+  | Ast.Variable v -> datatype_of_variable typtab v
+  | Ast.Assign (v, e) -> check_assign typtab (v, e); Unit
+  | Ast.Tuple l -> Tuple (List.map (datatype_of_expr typtab) l)
+  | _ -> failwith "datatype_of_expr"
+  (* | Ast.List l -> expr list
+  | Ast.Array l -> expr list
+  | Ast.Record l -> record_expr
+  | Ast.Call (c, e) -> expr * expr
+  | Ast.Construct (name, e) -> string * expr
+  | Ast.Unary (op, e) -> unary_op * expr
+  | Ast.Binary (op, a, b) -> binary_op * expr * expr
+  | Ast.Local (b, e) -> value_bindings * expr
+  | Ast.IfExpr e -> if_expr
+  | Ast.MatchExpr e -> match_expr
+  | Ast.LambdaExpr e -> lambda_expr
+  | Ast.ExprList l -> expr list
+  | Ast.ExprWithType (e, t) -> expr * type_expr *)
+
+and datatype_of_variable typtab = function
+  | Ast.Expr (None, name) -> lookup_symbol name typtab
+  | _ -> failwith "datatype_of_variable: not implemented"
+
+and check_assign typtab (v, e) =
+  failwith "check_assign"
 
 let rec walk_method_bindings typtab (r, l) =
   typtab

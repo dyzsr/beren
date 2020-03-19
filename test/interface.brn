@@ -1,11 +1,24 @@
-type error = interface
-    error_message : unit -> string
+type ('a, 'b) result =
+  | OK of 'a
+  | Err of 'b
+
+type error = sig
+  error_message : unit -> string
 end
 
-type reader = interface
-    read : buffer -> (unit * error) result
+type buffer = string
+
+type reader = sig
+  read : buffer -> (unit * error) result
 end
 
-type writer = interface
-    write : buffer -> (unit * error) result
+type writer = sig
+  write : buffer -> (unit * error) result
+end
+
+type interface = sig
+  name : string;
+  len : unit -> int;
+  less : int -> int -> bool;
+  swap : int -> int -> unit;
 end

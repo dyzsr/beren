@@ -1,7 +1,7 @@
 type book = {
-    name : string,
-    author : string,
-    mutable content : string,
+    name : string;
+    author : string;
+    content : string ref;
 }
 
 method (b : book) get_name () = b.book
@@ -9,4 +9,4 @@ and (b : book) get_author () = b.author
 and (b : book) get_intro () = b.get_name () ^ b.get_author ()
 
 method (b : book) get_content () = b.content
-and (b : book) set_content new_content = b.content <- new_content
+and (b : book) set_content new_content = b.content := new_content

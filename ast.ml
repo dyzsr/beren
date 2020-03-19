@@ -26,8 +26,8 @@ and type_name =
   | TypeName of string
 
 and variants_type = (string (* constructor *) * type_expr option) list
-and record_type = (bool (* mutable *) * string (* id *) * type_expr) list
-and interface_type = (string (* id *) * type_expr (* function type *) ) list
+and record_type = (string (* field name *) * type_expr) list
+and interface_type = (string (* signature *) * type_expr (* type *) ) list
 
 and value_bindings = bool (* recursive *) * value_binding list
 and value_binding = pattern * expr
@@ -48,6 +48,7 @@ and pattern =
   | ArrayPattern of pattern list (* #[?, ?, ...] *)
   | RecordPattern of record_pattern (* {?=?, ...} *)
   | VariablePattern of string (* id *)
+  | RefPattern of pattern
   | Wildcard
   | VariantsPattern of string (* constructor *) * pattern option (* value *)
   | PatternList of pattern list
@@ -63,7 +64,6 @@ and expr =
   | String of string
   | Variable of variable
   | Assign of variable * expr
-  | AssignRef of variable * expr
   | Tuple of expr list
   | List of expr list
   | Array of expr list
@@ -174,7 +174,7 @@ and variant_type_to_rep l =
   in ManyLines ("variants-type", List.map aux l)
 
 and record_type_to_rep l =
-  let aux (mut, name, typ) =
+  let aux (name, typ) =
     ManyLines ("field", [OneLine ("name", name); type_expr_to_rep typ])
   in ManyLines ("record-type", List.map aux l)
 
@@ -216,6 +216,7 @@ and pattern_to_rep = function
   | ArrayPattern l -> ManyLines ("array-pattern", List.map pattern_to_rep l)
   | RecordPattern p -> record_pattern_to_rep p (* {?=?, ...} *)
   | VariablePattern v -> OneLine ("variable-pattern", v) (* id *)
+  | RefPattern p -> ManyLines ("ref-pattern", [pattern_to_rep p])
   | Wildcard -> OneLine ("wildcard", "_")
   | VariantsPattern (name, pat_opt) -> begin
     match pat_opt with
@@ -239,7 +240,6 @@ and expr_to_rep = function
   | String s -> OneLine ("string", s)
   | Variable v -> variable_to_rep v
   | Assign (v, e) -> ManyLines ("assignment", [variable_to_rep v; expr_to_rep e])
-  | AssignRef (v, e) -> ManyLines ("assignment-ref", [variable_to_rep v; expr_to_rep e])
   | Tuple l -> ManyLines ("tuple", List.map expr_to_rep l)
   | List l -> ManyLines ("list", List.map expr_to_rep l)
   | Array l -> ManyLines ("array", List.map expr_to_rep l)

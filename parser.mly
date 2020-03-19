@@ -18,11 +18,11 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
 
 %token EOF
 %token LET "let" TYPE "type" METHOD "method" AND "and"
-%token REC "rec" IN "in" MUTABLE "mutable" OF "of"
+%token REC "rec" IN "in" OF "of"
 %token FUN "fun" FUNCTION "function"
 %token IF "if" THEN "then" ELSE "else"
 %token MATCH "match" WITH "with"
-%token INTERFACE "interface" END "end"
+%token SIG "sig" END "end"
 
 %token WILDCARD "_"
 %token <int> INT
@@ -39,9 +39,8 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
 %token LPAREN "(" RPAREN ")" LBRACK "[" RBRACK "]" LBRACE "{" RBRACE "}"
 %token LBRACKBAR "[|" RBRACKBAR "|]"
 %token BAR "|" APPEND "@" CONS "::" DEREF "!"
-%token TO "=>" ARROW "->"
+%token TO "=>" ARROW "->" ASSIGN ":="
 %token SEMICOLON ";" COLON ":" COMMA "," PERIOD "."
-%token ASSIGN ":=" ASSIGNFIELD "<-"
 
 %start main
 %type <Ast.decl list> main
@@ -168,37 +167,30 @@ record_type:
 
 field_type_list:
     t=field_type { [t] }
-  | t=field_type "," { [t] }
-  | t=field_type "," l=field_type_list { t :: l }
+  | t=field_type ";" { [t] }
+  | t=field_type ";" l=field_type_list { t :: l }
 
 field_type:
-    m=is_mutable id=IDENT ":" t=type_expr { (m, id, t) }
-
-is_mutable:
-    { false }
-  | "mutable" { true }
+    id=IDENT ":" t=type_expr { (id, t) }
 
 interface_type:
-    "interface" "end" { InterfaceType [] }
-  | "interface" l=method_type_list "end" { InterfaceType l }
+    "sig" "end" { InterfaceType [] }
+  | "sig" l=signature_type_list "end" { InterfaceType l }
 
-method_type_list:
-    t=method_type { [t] }
-  | t=method_type "," { [t] }
-  | t=method_type "," l=method_type_list { t :: l }
+signature_type_list:
+    t=signature_type { [t] }
+  | t=signature_type ";" { [t] }
+  | t=signature_type ";" l=signature_type_list { t :: l }
 
-method_type:
-    id=IDENT ":" t=must_function_type { (id, t) }
+signature_type:
+    id=IDENT ":" t=type_expr { (id, t) }
 
 type_expr:
     t=type_infix_function { t }
 
 type_infix_function:
     t=type_infix_tuple { t }
-  | t=must_function_type { t }
-
-must_function_type:
-    a=type_infix_tuple "->" b=type_infix_function { FunctionType (a, b) }
+  | a=type_infix_tuple "->" b=type_infix_function { FunctionType (a, b) }
 
 type_infix_tuple:
     t=inner_type_expr { t }
@@ -283,6 +275,7 @@ pattern_infix_cons:
 inner_pattern:
     p=highest_prec_pattern { p }
   | p=variant_with_value_pattern { p }
+  | p=ref_pattern { p }
 
 highest_prec_pattern:
     p=pattern_terminal { p }
@@ -336,8 +329,8 @@ record_pattern:
 
 field_pattern_list:
     p=field_pattern { [p] }
-  | p=field_pattern "," { [p] }
-  | p=field_pattern "," l=field_pattern_list { p :: l }
+  | p=field_pattern ";" { [p] }
+  | p=field_pattern ";" l=field_pattern_list { p :: l }
 
 field_pattern:
     id=IDENT "=" p=pattern { (id, p) }
@@ -353,18 +346,16 @@ variant_with_value_pattern:
     cid=CAPID p=pattern_terminal { VariantsPattern (cid, Some p) }
   | cid=CAPID "(" p=pattern ")" { VariantsPattern (cid, Some p) }
 
+ref_pattern:
+    "!" p=pattern_terminal { RefPattern p }
+  | "!" "(" p=pattern ")" { RefPattern p }
+
 infix_op:
     e=infix_assign { e }
 
 infix_assign:
     e=infix_or { e }
   | b=binding ":=" e=infix_assign
-    {
-      match b with
-      | Variable v -> AssignRef (v, e)
-      | _ -> failwith "infix_assign"
-    }
-  | b=binding "<-" e=infix_assign
     {
       match b with
       | Variable v -> Assign (v, e)
@@ -489,8 +480,8 @@ record:
 
 field_list:
     f=field_binding { [f] }
-  | f=field_binding "," { [f] }
-  | f=field_binding "," l=field_list { f :: l }
+  | f=field_binding ";" { [f] }
+  | f=field_binding ";" l=field_list { f :: l }
 
 field_binding:
     id=IDENT "=" e=expr { (id, e) }

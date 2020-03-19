@@ -15,7 +15,6 @@ let token_to_string =
   | AND -> "and"
   | REC -> "rec"
   | IN -> "in"
-  | MUTABLE -> "mutable"
   | OF -> "of"
   | FUN -> "fun"
   | FUNCTION -> "function"
@@ -24,7 +23,7 @@ let token_to_string =
   | ELSE -> "else"
   | MATCH -> "match"
   | WITH -> "with"
-  | INTERFACE -> "interface"
+  | SIG -> "sig"
   | END -> "end"
   | PLUS -> "+" 
   | MINUS -> "-" 
@@ -59,11 +58,10 @@ let token_to_string =
   | COMMA -> "," 
   | PERIOD -> "."
   | ASSIGN -> ":=" 
-  | ASSIGNFIELD -> "<-"
 
 let lexer lexbuf =
   let tok = Lexer.lex lexbuf in
-  let () = print_endline ("token: " ^ token_to_string tok) in
+  (* let () = print_endline ("token: " ^ token_to_string tok) in *)
   tok
 
 let pos_to_string Lexing.{pos_lnum=lnum; pos_bol=bol; pos_cnum=cnum} =
