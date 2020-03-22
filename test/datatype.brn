@@ -25,3 +25,5 @@ type nat =
   | S of nat
 
 type 'b t = 'b option
+
+let (a : 'b option) = None

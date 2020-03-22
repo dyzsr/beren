@@ -62,6 +62,7 @@ and expr =
   | Int of int
   | Char of char
   | String of string
+  | CapIdent of string
   | Variable of variable
   | Assign of variable * expr
   | Tuple of expr list
@@ -69,7 +70,6 @@ and expr =
   | Array of expr list
   | Record of record_expr
   | Call of expr * expr
-  | Construct of string * expr
   | Unary of unary_op * expr
   | Binary of binary_op * expr * expr
   | Local of value_bindings * expr
@@ -79,13 +79,7 @@ and expr =
   | ExprList of expr list
   | ExprWithType of expr * type_expr
 
-and variable =
-  | Expr of expr option * string
-  | Module of module_binding * string
-
-and module_binding =
-  | LeafModule of string
-  | SubModule of module_binding * string
+and variable = expr option * string
 
 and record_expr = (string * expr) list 
 
@@ -98,13 +92,11 @@ and binary_op =
   | And | Or | Cons | Append | Concat
 
 and if_expr = expr (* condition *) * expr (* then *) * expr option (* else *)
-
-and match_expr = expr * (pattern * expr) list (* matching branches *)
-
-and lambda_expr = (pattern * expr) list (* function branches *)
+and match_expr = expr * match_branch list (* matching branches *)
+and lambda_expr = match_branch list (* function branches *)
+and match_branch = pattern * expr
 
 type prototype = Prototype of pattern list * type_expr option
-
 
 (* Visualization of AST *)
 type rep =
@@ -238,6 +230,7 @@ and expr_to_rep = function
   | Int i -> OneLine ("int", string_of_int i)
   | Char c -> OneLine ("char", String.make 1 c)
   | String s -> OneLine ("string", s)
+  | CapIdent name -> OneLine ("capital-ident", name)
   | Variable v -> variable_to_rep v
   | Assign (v, e) -> ManyLines ("assignment", [variable_to_rep v; expr_to_rep e])
   | Tuple l -> ManyLines ("tuple", List.map expr_to_rep l)
@@ -245,7 +238,6 @@ and expr_to_rep = function
   | Array l -> ManyLines ("array", List.map expr_to_rep l)
   | Record e -> record_expr_to_rep e
   | Call (caller, e) -> ManyLines ("call", [expr_to_rep caller; expr_to_rep e])
-  | Construct (name, e) -> ManyLines ("construct", [OneLine ("constructor", name); expr_to_rep e])
   | Unary (op, e) -> unary_op_to_rep (op, e)
   | Binary (op, a, b) -> binary_op_to_rep (op, a, b)
   | Local (b, e) -> ManyLines ("local", [value_bindings_to_rep b; expr_to_rep e])
@@ -256,14 +248,8 @@ and expr_to_rep = function
   | ExprWithType (e, typ) -> ManyLines ("expr-with-type", [expr_to_rep e; type_expr_to_rep typ])
  
 and variable_to_rep = function
-  | Expr (None, name) -> OneLine ("variable", name)
-  | Expr (Some e, name) -> ManyLines ("variable", [expr_to_rep e; OneLine("name", name)])
-  | Module (b, name) -> begin
-    let rec module_to_rep = function
-      | LeafModule name -> name
-      | SubModule (parent, name) -> module_to_rep parent ^ "." ^ name
-    in ManyLines ("variable", [OneLine ("module", module_to_rep b); OneLine("name", name)])
-    end
+  | (None, name) -> OneLine ("variable", name)
+  | (Some e, name) -> ManyLines ("variable", [expr_to_rep e; OneLine("name", name)])
 
 and record_expr_to_rep l =
   let field_to_rep (name, e) =

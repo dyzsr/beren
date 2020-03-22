@@ -411,7 +411,6 @@ prefix_minus:
 inner_expr:
     e=highest_prec { e }
   | e=call { e }
-  | e=construction { e }
 
 highest_prec:
     e=terminal { e }
@@ -448,13 +447,9 @@ literal:
   | s=STRING { String s }
 
 binding:
-    id=IDENT { Variable (Expr (None, id)) }
-  | e=highest_prec "." id=IDENT { Variable (Expr (Some e, id)) }
-  | m=module_binding "." id=IDENT { Variable (Module (m, id)) }
-
-module_binding:
-    cid=CAPID { LeafModule cid }
-  | m=module_binding "." cid=CAPID { SubModule (m, cid) }
+    id=IDENT { Variable (None, id) }
+  | cid=CAPID { CapIdent cid }
+  | e=highest_prec "." id=IDENT { Variable (Some e, id) }
 
 unit:
     "(" ")" { Unit }
@@ -492,8 +487,5 @@ call:
 caller:
     e=highest_prec { e }
   | e=call { e }
-
-construction:
-    cid=CAPID e=highest_prec { Construct (cid, e) }
 
 %%

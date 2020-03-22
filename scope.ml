@@ -14,6 +14,9 @@ let make defaults : 'a t =
 let add name value (map : 'a t) : 'a t =
   String_map.add name value map
 
+let update name f (map : 'a t) =
+  String_map.update name f map
+
 (* lookup a symbol from the scope *)
 let lookup name (map : 'a t) =
   String_map.find_opt name map
