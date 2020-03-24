@@ -5,9 +5,9 @@ type decl =
   | MethodBindings of method_bindings
 
 and type_bindings = bool (* recursive *) * type_binding list
-and type_binding = type_param option * string (* id *) * type_construct
+and type_binding = type_variable option * string (* id *) * type_construct
 
-and type_param = string list
+and type_variable = string list
 
 and type_construct =
   | TypeExpr of type_expr
@@ -75,7 +75,7 @@ and expr =
   | Local of value_bindings * expr
   | IfExpr of if_expr
   | MatchExpr of match_expr
-  | LambdaExpr of lambda_expr
+  | LambdaExpr of pattern * expr
   | ExprList of expr list
   | ExprWithType of expr * type_expr
 
@@ -93,7 +93,6 @@ and binary_op =
 
 and if_expr = expr (* condition *) * expr (* then *) * expr option (* else *)
 and match_expr = expr * match_branch list (* matching branches *)
-and lambda_expr = match_branch list (* function branches *)
 and match_branch = pattern * expr
 
 type prototype = Prototype of pattern list * type_expr option
@@ -119,29 +118,29 @@ let rec decl_to_rep = function
   | MethodBindings b -> method_bindings_to_rep b
 
 and type_bindings_to_rep ((r, l) : type_bindings) =
-  let binding_to_rep (params_opt, id, construct) =
-    match params_opt with
+  let binding_to_rep (typvars_opt, id, construct) =
+    match typvars_opt with
     | None -> 
       let id_rep = OneLine ("name", id) in
       let construct_rep = type_construct_to_rep construct in
       ManyLines ("binding", [id_rep; construct_rep])
-    | Some params ->
-      let params_rep = type_params_to_rep params in
+    | Some vars ->
+      let vars_rep = type_vars_to_rep vars in
       let id_rep = OneLine ("name", id) in
       let construct_rep = type_construct_to_rep construct in
-      ManyLines ("binding", [params_rep; id_rep; construct_rep])
+      ManyLines ("binding", [vars_rep; id_rep; construct_rep])
   in
   let name = "type " ^ if r then "rec" else "nonrec" in
   let bindings = List.map binding_to_rep l in
   ManyLines (name, bindings)
 
-and type_params_to_rep = function
-  | [] -> failwith "type_params_to_rep"
-  | [x] -> OneLine ("param", "'" ^ x)
+and type_vars_to_rep = function
+  | [] -> failwith "type_vars_to_rep"
+  | [x] -> OneLine ("var", "'" ^ x)
   | l ->
     let aux x =
-      OneLine ("params", "'" ^ x)
-    in ManyLines ("params", (List.map aux l))
+      OneLine ("vars", "'" ^ x)
+    in ManyLines ("vars", (List.map aux l))
 
 and type_construct_to_rep = function
   | TypeExpr t -> type_expr_to_rep t
@@ -154,8 +153,8 @@ and type_expr_to_rep = function
     OneLine ("single-type", match t with TypeName s -> s | TypeSymbol s -> "'" ^ s)
   | TupleType l ->
     ManyLines ("tuple-type", List.map type_expr_to_rep l)
-  | FunctionType (param, res) ->
-    ManyLines ("function-type", [type_expr_to_rep param; type_expr_to_rep res])
+  | FunctionType (arg, body) ->
+    ManyLines ("function-type", [type_expr_to_rep arg; type_expr_to_rep body])
   | SpecificType (arg, name) ->
     ManyLines ("specific-type", [type_expr_to_rep arg; OneLine ("generics-type", name)])
 
@@ -243,7 +242,7 @@ and expr_to_rep = function
   | Local (b, e) -> ManyLines ("local", [value_bindings_to_rep b; expr_to_rep e])
   | IfExpr e -> if_expr_to_rep e
   | MatchExpr e -> match_expr_to_rep e
-  | LambdaExpr e -> lambda_expr_to_rep e
+  | LambdaExpr (arg, body) -> lambda_expr_to_rep (arg, body)
   | ExprList l -> ManyLines ("multi-expr", List.map expr_to_rep l)
   | ExprWithType (e, typ) -> ManyLines ("expr-with-type", [expr_to_rep e; type_expr_to_rep typ])
  
@@ -279,8 +278,11 @@ and if_expr_to_rep = function
 and match_expr_to_rep (e, l) =
   ManyLines ("match", expr_to_rep e :: List.map branch_to_rep l)
 
-and lambda_expr_to_rep l =
-  ManyLines ("function", List.map branch_to_rep l)
+and lambda_expr_to_rep (arg, body) =
+  ManyLines ("function",
+    [ ManyLines ("arg", [pattern_to_rep arg])
+    ; ManyLines ("body", [expr_to_rep body])
+    ])
 
 and branch_to_rep (p, e) =
   ManyLines ("branch", [pattern_to_rep p; expr_to_rep e])

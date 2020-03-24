@@ -1,0 +1,20 @@
+type 'a option =
+  | None
+  | Some of 'a
+
+let a = None
+and b = Some 123
+
+let none () = None
+
+let some x = Some x
+
+let value opt default =
+  match opt with
+  | None => default
+  | Some v => v
+
+let bind a f =
+  match a with
+  | None => None
+  | Some v => Some (f v)

@@ -10,7 +10,22 @@ let max a b =
 let rec gcd a b =
   if b = 0 then a else gcd b (a % b)
 
+let rec fact = function
+  | 0 => 1
+  | n => n * fact (n-1)
+
 let rec expt a n =
   if n = 0 then 1 else
   if n % 2 = 0 then expt (a*a) (n/2) else
   a * expt a (n - 1)
+
+let foo () =
+  let f x = x in
+  let g (f : int -> int) = f in
+  let _ = g f in
+  f
+
+let fo = foo ()
+
+let rec f x = x
+and g () = f 1

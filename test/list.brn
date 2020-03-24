@@ -1,3 +1,7 @@
+let rec length = function
+  | [] => 0
+  | h :: t => 1 + length t
+
 let length l =
   let rec aux acc = function
   | [] => acc
@@ -9,10 +13,23 @@ let rev l =
   let rec aux acc = function
     | [] => acc
     | h :: t => aux (h :: acc) t
-  in aux l
+  in
+  aux [] l
+
+let make n x = 
+  let rec aux acc = function
+  | 0 => acc
+  | n => aux (x :: acc) (n - 1)
+  in
+  aux [] n
 
 let map f l =
   let rec iter acc = function
     | [] => acc
     | h :: t => iter (f h :: acc) t
-  in rev (iter [] l)
+  in
+  rev (iter [] l)
+
+let rec map f = function
+  | [] => []
+  | h :: t => f h :: map f t

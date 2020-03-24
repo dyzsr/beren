@@ -99,6 +99,6 @@ let _ =
       let result = parse lexer lexbuf in
       let print_ast decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
       let () = List.iter print_ast result in
-      let _ = Types.walk_decl_list result in
-      ()
+      let symtab = Types.walk_decl_list result in
+      Types.print_symtab symtab
     with SyntaxError s -> print_endline s

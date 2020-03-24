@@ -1,0 +1,4 @@
+let f g x = g x
+
+let rec f1 x = x
+and g1 y = f1 (1 + y)

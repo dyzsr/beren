@@ -8,10 +8,10 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
     | [] -> failwith "val_of_fun: no enough arguments"
     | arg :: [] -> begin
       match type_tag with
-        | None -> LambdaExpr [(arg, expr)]
-        | Some t -> LambdaExpr [(arg, ExprWithType (expr, t))]
+        | None -> LambdaExpr (arg, expr)
+        | Some t -> LambdaExpr (arg, ExprWithType (expr, t))
       end
-    | arg :: rest -> LambdaExpr [(arg, aux rest)]
+    | arg :: rest -> LambdaExpr (arg, aux rest)
   in aux patterns
 
 %}
@@ -242,14 +242,19 @@ match_branch:
 
 lambda_expr:
     e=fun_expr { e }
-  | e=function_expr { e }
+  | e=function_expr
+    { let name = "[arg]" in
+      let arg = VariablePattern name in
+      let body = MatchExpr (Variable (None, name), e) in
+      LambdaExpr (arg, body)
+    }
 
 fun_expr:
     "fun" proto=prototype "=>" e=expr { val_of_fun e proto }
 
 function_expr:
-    "function" l=match_list { LambdaExpr l }
-  | "function" "|" l=match_list { LambdaExpr l }
+    "function" l=match_list { l }
+  | "function" "|" l=match_list { l }
 
 pattern:
     p=single_pattern { p }
