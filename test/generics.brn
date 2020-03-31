@@ -1,0 +1,15 @@
+type 'a item =
+  | One of 'a
+  | Many of 'a * int
+
+type 'a item2 = 'a item
+
+let (a : string item2) = One "abc"
+
+
+type ('a, 'b) t = 'a * 'b
+type ('a, 'b) tt = ('a * 'a) t
+
+(*
+let (a : (int * int) t) = (1, 2)
+*)

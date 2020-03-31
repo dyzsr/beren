@@ -1,6 +1,8 @@
 (* Unique identifier *)
 type id = int
 
+module Id_map = Map.Make (Int)
+
 type idgen =
   { current_id : unit -> id
   ; new_id : unit -> id
