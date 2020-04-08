@@ -7,7 +7,7 @@ let token_to_string =
   | STRING s -> "\"" ^ s ^ "\""
   | IDENT id -> "id<" ^ id ^ ">"
   | CAPID id -> "id<" ^ id ^ ">"
-  | TYPESYMBOL s -> "'" ^ s
+  | TYPEVAR s -> "'" ^ s
   | EOF -> "EOF"
   | LET -> "let"
   | TYPE -> "type" 

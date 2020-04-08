@@ -2,3 +2,14 @@ let f g x = g x
 
 let rec f1 x = x
 and g1 y = f1 (1 + y)
+
+let foo () =
+  let f x = x in
+  let g (f : int -> int) = f in
+  let _ = g f in
+  f
+
+let fo = foo ()
+
+let rec f x = x
+and g () = f 1

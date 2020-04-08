@@ -4,12 +4,14 @@ type 'a item =
 
 type 'a item2 = 'a item
 
-let (a : string item2) = One "abc"
+let (x : string item2) = One "abc"
 
 
 type ('a, 'b) t = 'a * 'b
-type ('a, 'b) tt = ('a * 'a) t
+type 'a tt = ('a, 'a) t
 
-(*
-let (a : (int * int) t) = (1, 2)
-*)
+let (a : (int, string) t) = (123, "abc")
+let (b : int tt) = (123, 456)
+let (c : string tt) = ("abc", "def")
+
+(* let (d : string tt) = ("abc", 456) *)

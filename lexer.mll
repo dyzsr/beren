@@ -87,7 +87,7 @@ and lex_comment = parse
 and lex_quote = parse
     eol   { Lexing.new_line lexbuf; lex_quote lexbuf }
   | space { lex_quote lexbuf }
-  | alpha alnum* as lxm { TYPESYMBOL lxm }
+  | alpha alnum* as lxm { TYPEVAR lxm }
 
 and lex_char acc = parse
     "\'" {

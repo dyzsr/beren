@@ -31,7 +31,7 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
 %token <string> STRING
 %token <string> IDENT
 %token <string> CAPID
-%token <string> TYPESYMBOL
+%token <string> TYPEVAR
 
 %token PLUS "+" MINUS "-" TIMES "*" DIV "/" MOD "%" CONCAT "^"
 %token LT "<" LTE "<=" GT ">" GTE ">=" EQ "=" NEQ "!="
@@ -133,15 +133,15 @@ type_binding:
   | p=type_param id=IDENT "=" t=type_construct { (Some p, id, t) }
 
 type_param:
-    t=type_symbol { [t] }
-  | "(" t=type_symbol "," l=type_symbol_list ")" { t :: l }
+    t=type_variable { [t] }
+  | "(" t=type_variable "," l=type_variable_list ")" { t :: l }
 
-type_symbol_list:
-    t=type_symbol { [t] }
-  | t=type_symbol "," l=type_symbol_list { t :: l }
+type_variable_list:
+    t=type_variable { [t] }
+  | t=type_variable "," l=type_variable_list { t :: l }
 
-type_symbol:
-    s=TYPESYMBOL { s }
+type_variable:
+    s=TYPEVAR { s }
 
 type_construct:
     t=type_expr { TypeExpr t }
@@ -209,11 +209,19 @@ highest_prec_type_expr:
   | "(" t=type_expr ")" { t }
 
 type_specialization:
-    t=highest_prec_type_expr id=IDENT { SpecificType (t, id) }
+    l=type_arguments id=IDENT { SpecificType (l, id) }
+
+type_arguments:
+    t=highest_prec_type_expr { [t] }
+  | "(" l=type_argument_list ")" { l }
+
+type_argument_list:
+    t=type_expr { [t] }
+  | t=type_expr "," l=type_argument_list { t :: l }
 
 type_terminal:
     id=IDENT { SingleType (TypeName id) }
-  | t=type_symbol { SingleType (TypeSymbol t) }
+  | t=type_variable { SingleType (TypeSymbol t) }
 
 expr:
     e=local_expr { e }

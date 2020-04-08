@@ -19,7 +19,7 @@ and type_expr =
   | SingleType of type_name
   | TupleType of type_expr list
   | FunctionType of type_expr * type_expr
-  | SpecificType of type_expr * string
+  | SpecificType of type_expr list * string
 
 and type_name =
   | TypeSymbol of string
@@ -155,8 +155,9 @@ and type_expr_to_rep = function
     ManyLines ("tuple-type", List.map type_expr_to_rep l)
   | FunctionType (arg, body) ->
     ManyLines ("function-type", [type_expr_to_rep arg; type_expr_to_rep body])
-  | SpecificType (arg, name) ->
-    ManyLines ("specific-type", [type_expr_to_rep arg; OneLine ("generics-type", name)])
+  | SpecificType (args, name) ->
+    let typevars = ManyLines ("type-variables", List.map type_expr_to_rep args) in
+    ManyLines ("specific-type", [typevars; OneLine ("generics-type", name)])
 
 and variant_type_to_rep l =
   let aux = function
