@@ -12,11 +12,13 @@
   - [全局符号区](#%e5%85%a8%e5%b1%80%e7%ac%a6%e5%8f%b7%e5%8c%ba)
   - [函数代码区](#%e5%87%bd%e6%95%b0%e4%bb%a3%e7%a0%81%e5%8c%ba)
 - [4. 指令集设计](#4-%e6%8c%87%e4%bb%a4%e9%9b%86%e8%ae%be%e8%ae%a1)
-  - [函数定义示例](#%e5%87%bd%e6%95%b0%e5%ae%9a%e4%b9%89%e7%a4%ba%e4%be%8b)
+  - [字面量](#%e5%ad%97%e9%9d%a2%e9%87%8f)
+  - [寄存器](#%e5%af%84%e5%ad%98%e5%99%a8)
   - [赋值相关指令](#%e8%b5%8b%e5%80%bc%e7%9b%b8%e5%85%b3%e6%8c%87%e4%bb%a4)
+  - [数据访问指令](#%e6%95%b0%e6%8d%ae%e8%ae%bf%e9%97%ae%e6%8c%87%e4%bb%a4)
+  - [基本运算指令](#%e5%9f%ba%e6%9c%ac%e8%bf%90%e7%ae%97%e6%8c%87%e4%bb%a4)
   - [函数定义相关指令](#%e5%87%bd%e6%95%b0%e5%ae%9a%e4%b9%89%e7%9b%b8%e5%85%b3%e6%8c%87%e4%bb%a4)
   - [函数调用相关指令](#%e5%87%bd%e6%95%b0%e8%b0%83%e7%94%a8%e7%9b%b8%e5%85%b3%e6%8c%87%e4%bb%a4)
-  - [基本运算指令](#%e5%9f%ba%e6%9c%ac%e8%bf%90%e7%ae%97%e6%8c%87%e4%bb%a4)
   - [流程控制指令](#%e6%b5%81%e7%a8%8b%e6%8e%a7%e5%88%b6%e6%8c%87%e4%bb%a4)
 
 Beren程序运行在Beren语言虚拟机上。想要运行一段Beren源代码，需要先将源代码编译成
@@ -75,11 +77,43 @@ Beren编译器输出的中间表达形式由**类型信息区**、**全局符号
 类型信息区存储的映射可以帮助虚拟机从指令序列中的简化类型恢复出源代码中的类型信息。
 类型信息包含了元组、不定类型、记录等类型的映射。
 
+```
+.variant
+.name option
+  1: None
+  .type nil
+  2: Some
+  .type any
+
+.variant
+.name result
+  1: Ok
+  .type any
+  2: Error 
+  .type any
+
+.record
+.name box
+  1: contents
+  .type any
+
+...
+```
+
 ## 全局符号区
 
 全局符号区是一个由变量名组成的集合，每个变量名代表源代码中的一个全局变量。全局符号区
 的作用是方便虚拟机在指令序列中区分全局变量对应的静态寄存器和局部变量对应的局部变量寄
 存器。
+
+```
+.symbols:
+  map
+  filter
+  fold_left
+  fold_right
+  ...
+```
 
 ## 函数代码区
 
@@ -88,57 +122,265 @@ Beren编译器输出的中间表达形式由**类型信息区**、**全局符号
 函数签名包含了函数名、函数的参数类型、返回值类型等信息。函数体则是表示其运算过程的
 指令序列。
 
+**函数定义示例**
+
+```
+.type:
+  int -> int -> int
+gcd:
+  capture $1, %arg
+  setenv %inner_fun_gcd
+  makefun %val_1
+  return %val_1
+  
+.env:
+  a
+.type:
+  int -> int
+%inner_fun_gcd:
+  loadint %val_1, 0
+  eqint _, %val_1, a
+  jmpfalse .L1
+  return a
+.L1:
+  setarg %arg
+  call gcd
+  getret %val_2
+  mod %val_3, a, %arg
+  setarg %val_3
+  call %val_2
+  getret %val_4
+  return %val_4
+```
+
 # 4. 指令集设计
 
-## 函数定义示例
+## 字面量
 
-```
-```
+字面量以`$`起始，可以是布尔型、整型、字符型或字符串型字面量。
 
+## 寄存器
+
+寄存器由小写字母起始或是以`%`起始的标识符表示，寄存器可以存储任意类型的数值。
 
 ## 赋值相关指令
 
-字面量读取
+字面量赋值
+
+以下尖括号包围的标识符（`<dest>, <src>, <...>`）均表示寄存器。
+
+```
+loadunit <dest>
+loadbool <dest>, $true
+loadint <dest>, $123
+loadchar <dest>, $'a'
+loadstr <dest>, $"abc"
+```
+
+元组赋值
+
+```
+loadint <src-1> $123
+loadbool <src-2> $false
+loadstr <src-3> "abc"
+
+pushpart <src-1>
+pushpart <src-2>
+pushpart <src-3>
+
+maketup <dest>
+```
+
+不定类型赋值
+
+```
+load... <some-value> ...
+
+setnum $1
+setval <some-value>
+
+makevariant <dest>
+```
+
+记录赋值
+
+```
+pushfield <src-1>
+pushfield <src-2>
+makerecord <dest>
+```
 
 寄存器赋值
 
+```
+move <dest>, <src>
+```
 
-## 函数定义相关指令
+引用赋值
 
-函数签名
-
-闭包变量寄存器
-
-函数形参寄存器
-
-函数返回
-
-闭包构造
+```
+assign <dest>, <src>
+```
 
 
-## 函数调用相关指令
+## 数据访问指令
 
-函数实参传入
+解引用
 
-函数调用
+```
+deref <dest>, <src>
+```
 
-函数返回值获取
+元组
+
+```
+tuplepart <dest>, $1, <src>
+tuplepart <dest>, $2, <src>
+```
+
+不定类型
+
+```
+variantnum <dest>, <src>
+
+variantval <dest>, <src>
+```
+
+记录
+
+```
+recordfield <dest>, $1, <src>
+recordfield <dest>, $2, <src>
+```
 
 
 ## 基本运算指令
 
 整型运算
 
+```
+intadd <dest>, <src-1>, <src-2>
+intsub <dest>, <src-1>, <src-2>
+...
+```
+
 布尔型运算
+
+```
+booland <dest>, <src-1>, <src-2>
+boolor <dest>, <src-1>, <src-2>
+boolnot <dest>, <src>
+```
 
 字符串运算
 
+```
+strcat <dest>, <src-1>, <src-2>
+strlen <dest>, <src>
+strpos <dest>, <src>, <pos>
+...
+```
+
 逻辑运算
+
+```
+intlt <dest>, <src-1>, <src-2>
+intlte <dest>, <src-1>, <src-2>
+inteq <dest>, <src-1>, <src-2>
+...
+```
+
+
+## 函数定义相关指令
+
+函数签名
+
+```
+.env:
+  var_x
+.type:
+  int -> int
+foo:
+  ...
+```
+
+闭包变量寄存器
+
+```
+name
+aaa
+xyz
+%qwe
+%clo
+```
+
+函数形参
+
+```
+getarg <dest>
+```
+
+函数返回
+
+```
+setret <src>
+```
+
+函数构造
+
+```
+makefun <fun-name>, .decl
+```
+
+闭包构造
+
+```
+capture $1, <src-1>
+capture $2, <src-2>
+makeclos <closure-name>, .decl
+```
+
+
+## 函数调用相关指令
+
+函数实参传入
+
+```
+setarg <src>
+```
+
+函数返回值获取
+
+```
+getret <dest>
+```
+
+函数调用
+
+```
+setarg <arg>
+call <fun>
+getret <dest>
+```
 
 
 ## 流程控制指令
 
 条件跳转
 
+```
+jmptrue .label
+jmpfalse .label
+```
+
 无条件跳转
 
+```
+jmp .label
+```
+
+选择操作
+
+```
+select <dest>, <src-1>, <src-2>
+```

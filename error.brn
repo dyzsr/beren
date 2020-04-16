@@ -1,0 +1,16 @@
+type error =
+  interface
+	  error : unit -> string
+	end
+
+method (s : string) error () =
+  "error:" ^ s
+
+let print_error (e : error) =
+  print_endline (e->error ())
+	
+let () =
+  let s = "unknown message" in
+	print_error s
+
+

@@ -1,0 +1,54 @@
+let () =
+  let _ = () in
+  let _ = true in
+  let _ = 123 in
+  let _ = #'a' in
+  let _ = "abc" in
+  ()
+
+let () =
+  let _ = (1, 2, 3) in
+	let _ = (#'z', "def") in
+	let _ = None in
+	let _ = Some 456 in
+	let _ = { name="dy"; number=225 } in
+	()
+
+let _ = 
+  let x = 123 in
+	let y = 456 in
+	let z = x + y in
+	z
+
+let () = 
+  let f x = x in
+	let v = 123 in
+	let v = f v in
+	()
+
+let () =
+  let a = 123 in
+	let b = 456 in
+	if a < b then
+	  print_endline "a"
+	else
+	  print_endline "b"
+
+let () =
+  let v = Some "a" in
+	match v with
+	| None => print_endline "none"
+	| Some x => print_endline ("some " ^ x)
+
+let rec gcd a b =
+  if b = 0 then a else gcd b (a % b)
+
+let rec gcd = fun a b =>
+  if b = 0 then a else gcd b (a % b)
+
+let rec gcd a = function
+  | 0 => a
+	| b => gcd b (a % b)
+
+
+

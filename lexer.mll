@@ -1,9 +1,6 @@
 {
-open Parser
-exception Invalid_lexeme of string
-
-let string_of_chars list =
-  String.concat "" (List.map (String.make 1) list)
+  open Parser
+  exception Invalid_lexeme of string
 }
 
 let eol = '\n'
@@ -72,10 +69,10 @@ rule lex = parse
   | "."   { PERIOD }
   | ":="  { ASSIGN }
   | "(*"  { lex_comment lexbuf; lex lexbuf }
-  | "_"         { WILDCARD }
   | digit+ as lxm { INT (int_of_string lxm) }
-  | lowercase alnum* as lxm { IDENT lxm }
-  | uppercase alnum* as lxm { CAPID lxm }
+  | ("_" | lowercase) alnum* as lxm { IDENT lxm }
+  | uppercase alnum* as lxm         { CAPID lxm }
+  | "_"   { WILDCARD }
   | eof   { EOF }
 
 and lex_comment = parse
@@ -93,7 +90,7 @@ and lex_char acc = parse
     "\'" {
       match acc with
       | [x] -> CHAR x
-      | _ -> raise (Invalid_lexeme ("'" ^ string_of_chars (List.rev acc) ^ "'"))
+      | _ -> raise (Invalid_lexeme ("'" ^ Utils.string_of_chars (List.rev acc) ^ "'"))
     }
   | "\\n" { lex_char ('\n'::acc) lexbuf }
   | "\\r" { lex_char ('\r'::acc) lexbuf }
@@ -105,7 +102,7 @@ and lex_char acc = parse
   | _ as c { lex_char (c :: acc) lexbuf }
 
 and lex_string acc = parse
-    "\"" { STRING (string_of_chars (List.rev acc)) }
+    "\"" { STRING (Utils.string_of_chars (List.rev acc)) }
   | "\\n" { lex_string ('\n'::acc) lexbuf }
   | "\\r" { lex_string ('\r'::acc) lexbuf }
   | "\\t" { lex_string ('\t'::acc) lexbuf }

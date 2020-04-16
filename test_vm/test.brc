@@ -1,0 +1,21 @@
+.external
+  0, print_bool
+  1, print_int
+  2, print_char
+  3, print_string
+  4, print_endline
+  
+.global
+  0, gcd
+
+.numvars 1
+.func gcd
+  loadstr $(3, 0, s) "abc"
+  setarg $(3, 0, s)
+  call $(0, 4, print_endline)
+  ret
+
+.entry
+  makefunc 0 gcd $(1, 0, gcd)
+  call $(1, 0, gcd)
+  ret

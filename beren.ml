@@ -64,41 +64,35 @@ let lexer lexbuf =
   (* let () = print_endline ("token: " ^ token_to_string tok) in *)
   tok
 
-let pos_to_string Lexing.{pos_lnum=lnum; pos_bol=bol; pos_cnum=cnum} =
-  let lstr = "line " ^ string_of_int lnum in
-  let cstr = "column " ^ string_of_int (cnum - bol) in
-  lstr ^ ", " ^ cstr
-
 let read_token_until_eof lexer lexbuf =
   let rec aux = function
   | Parser.EOF -> ()
   | v -> aux (lexer lexbuf)
   in aux (lexer lexbuf)
 
-exception SyntaxError of string
+exception Syntax_error of string
 
 let parse lexer lexbuf = 
   try
     Parser.main lexer lexbuf
   with Parser.Error ->
     let token = Lexing.lexeme lexbuf in
-    let start_p  = pos_to_string (Lexing.lexeme_start_p lexbuf) in
-    let error_string = start_p ^ ": Syntax error at token '" ^ token ^ "'" in
-    raise (SyntaxError error_string)
+    let start_p  = Utils.pos_to_string (Lexing.lexeme_start_p lexbuf) in
+    let error_string = start_p ^ ": token '" ^ token ^ "'" in
+    raise (Syntax_error error_string)
 
 let _ = 
-  match Array.length Sys.argv with
-  | 1 -> failwith "no input file"
-  | n ->
-    let file = Sys.argv.(1) in
-    (* let () = print_endline file in *)
-    let chan = open_in file in
-    let lexbuf = Lexing.from_channel chan in
-    (* read_token_until_eof lexer lexbuf *)
-    try
-      let result = parse lexer lexbuf in
-      let print_ast decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
-      let () = List.iter print_ast result in
-      let symtab = Types.walk_decl_list result in
-      Types.print_symtab symtab
-    with SyntaxError s -> print_endline s
+  let _ = match Array.length Sys.argv with
+    | 1 -> failwith "no input file"
+    | n -> n
+  in
+  let file = Sys.argv.(1) in
+  (* let () = print_endline file in *)
+  let chan = open_in file in
+  let lexbuf = Lexing.from_channel chan in
+  (* read_token_until_eof lexer lexbuf *)
+  let result = parse lexer lexbuf in
+  let print_ast decl = print_endline (Ast.rep_to_string (Ast.decl_to_rep decl)) in
+  let () = List.iter print_ast result in
+  let symtab = Types.walk_decl_list result in
+  Types.print_symtab symtab

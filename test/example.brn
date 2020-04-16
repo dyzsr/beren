@@ -1,0 +1,39 @@
+type tree =
+  | Empty
+	| Tree of tree * int * tree
+
+method (t : tree) visit f =
+  match t with
+	| Empty => None
+	| Tree (l, x, r) => Some (f (l->visit f, x, r->visit f))
+
+let min_node t =
+  let f = function
+	| (None, x, None) => x
+	| (Some a, x, None) => min a x
+	| (None, x, Some b) => min x b
+	| (Some a, x, Some b) => min x (min a b)
+	in
+	t->visit f
+
+
+type expr =
+  | Int of int
+	| Plus of expr * expr
+	| Times of expr * expr
+
+method (v : expr) calc () =
+  match v with
+	| Int x => x
+	| Plus (a, b) => a->calc () + b->calc ()
+  | Times (a, b) => a->calc () * b->calc ()
+
+type calculator =
+  interface
+	  calc : unit -> int
+	end
+
+let calc (c : calculator) =
+  c->calc ()
+
+

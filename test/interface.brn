@@ -22,3 +22,4 @@ type interface = sig
   less : int -> int -> bool;
   swap : int -> int -> unit;
 end
+

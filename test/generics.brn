@@ -10,8 +10,11 @@ let (x : string item2) = One "abc"
 type ('a, 'b) t = 'a * 'b
 type 'a tt = ('a, 'a) t
 
+(* valid bindings *)
 let (a : (int, string) t) = (123, "abc")
 let (b : int tt) = (123, 456)
 let (c : string tt) = ("abc", "def")
 
+(* invalid binding *)
 (* let (d : string tt) = ("abc", 456) *)
+

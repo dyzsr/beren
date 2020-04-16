@@ -1,6 +1,6 @@
 open Utils
 
-let {new_id=new_typvar_id} = make_idgen 0
+let {new_id=new_tyvar_id} = make_idgen 0
 let {new_id=new_variants_id} = make_idgen 0
 let {new_id=new_record_id} = make_idgen 0
 let {new_id=new_generic_id} = make_idgen 0
@@ -14,26 +14,26 @@ type datatype =
   | String
   | Ref
   | Array
-  | Typvar of typvar
+  | Tyvar of tyvar
   | Tuple of datatype list
   | Variants of id * variant list (* variants *)
   | Record of id * field list (* fields *)
   | Interface of signature list
   | Function of datatype * datatype
-  | Generics of id * typvar list * datatype
+  | Generics of id * tyvar list * datatype
   | Specific of datatype list * datatype
   | Alias of string * datatype (* a complete type with an alias *)
   | Pending of string (* an incomplete type with only a name *)
 
 (* Type variable *)
-and typvar = string * id
+and tyvar = string * id
 
 and variant = string * datatype ref option
 and field = string (* name *) * datatype ref
 and signature = string * datatype ref
 
-let new_typvar name =
-  (name, new_typvar_id ())
+let new_tyvar name =
+  (name, new_tyvar_id ())
 
 module String_map = Map.Make (String)
 module Id_map = Utils.Id_map
@@ -110,7 +110,7 @@ let empty_tvtab =
 exception Unbound_type_variable of string
 exception Duplicate_type_variable of string
 
-let bind_typvar name key ({tvmap} as tvtab) =
+let bind_tyvar name key ({tvmap} as tvtab) =
   let update = function
   | None -> Some key
   | Some id when id = key -> Some key
@@ -119,21 +119,21 @@ let bind_typvar name key ({tvmap} as tvtab) =
   let tvmap = String_map.update name update tvmap in
   { tvtab with tvmap }
 
-let lookup_typvar name {tvmap} =
+let lookup_tyvar name {tvmap} =
   match String_map.find_opt name tvmap with
   | None -> raise (Unbound_type_variable name)
-  | Some typvar -> typvar
+  | Some tyvar -> tyvar
 
-let lookup_typvar_opt name {tvmap} =
+let lookup_tyvar_opt name {tvmap} =
   String_map.find_opt name tvmap
 
-let next_free_typvar key tvtab =
+let next_free_tyvar key tvtab =
   let rec iter ch count =
     let name =
       if count = 0 then String.make 1 ch
       else String.make 1 ch ^ string_of_int count
     in
-    match lookup_typvar_opt name tvtab with
+    match lookup_tyvar_opt name tvtab with
     | None -> name
     | Some id when id = key -> name
     | Some _ ->
@@ -144,14 +144,14 @@ let next_free_typvar key tvtab =
 
 let rec find_id key tvtab =
   (* let () = print_endline ("find_tvtab: " ^ string_of_int key) in *)
-  let typvar = Typvar ("a", key) in
+  let tyvar = Tyvar ("a", key) in
   match lookup_id key tvtab with
   | None -> (* found nothing *)
-    let tvtab = add_id key typvar tvtab in (* update *)
-    tvtab, typvar
-  | Some (Typvar (_, id) as t) when id = key -> (* found itself *)
+    let tvtab = add_id key tyvar tvtab in (* update *)
+    tvtab, tyvar
+  | Some (Tyvar (_, id) as t) when id = key -> (* found itself *)
     tvtab, t
-  | Some (Typvar (_, id)) -> (* found other type variable *)
+  | Some (Tyvar (_, id)) -> (* found other type variable *)
     let tvtab, t = find_id id tvtab in (* find root *)
     let tvtab = add_id key t tvtab in (* update the path to root *)
     tvtab, t
@@ -168,24 +168,24 @@ and lookup_id key {idmap} =
 
 (* Stringify *)
 let rec string_of_toplevel_datatype = function
-  | Alias (name, Generics (_, typvars, typ)) ->
+  | Alias (name, Generics (_, tyvars, typ)) ->
     let fold tvtab (name, id) =
-      bind_typvar name id tvtab
+      bind_tyvar name id tvtab
     in
-    let string_of_typvars = function
+    let string_of_tyvars = function
     | [(name, id)] -> ("'" ^ name)
     | l ->
-      let typvars = List.map (fun (name, _) -> "'" ^ name) l in
-      "(" ^ String.concat ", " typvars ^ ")"
+      let tyvars = List.map (fun (name, _) -> "'" ^ name) l in
+      "(" ^ String.concat ", " tyvars ^ ")"
     in
-    let tvmap = List.fold_left fold empty_tvtab typvars in
-    let typvars_string = string_of_typvars typvars in
+    let tvmap = List.fold_left fold empty_tvtab tyvars in
+    let tyvars_string = string_of_tyvars tyvars in
     (match typ with
-     | Ref -> "type " ^ typvars_string ^ " ref"
-     | Array -> "type " ^ typvars_string ^ " array"
+     | Ref -> "type " ^ tyvars_string ^ " ref"
+     | Array -> "type " ^ tyvars_string ^ " array"
      | _ ->
        let _, str = string_of_datatype tvmap 0 typ in
-       "type " ^ typvars_string ^ " " ^ name ^ " = " ^ str)
+       "type " ^ tyvars_string ^ " " ^ name ^ " = " ^ str)
   | Alias (name, typ) ->
     let _, str = string_of_datatype empty_tvtab 0 typ in
     "type " ^ name ^ " = " ^ str
@@ -204,15 +204,15 @@ and string_of_datatype tvmap priority = function
   | String -> tvmap, "string"
   | Ref -> failwith "string_of_datatype: ref"
   | Array -> failwith "string_of_datatype: array"
-  | Typvar (name, key) ->
+  | Tyvar (name, key) ->
     let tvmap, name =
-      match lookup_typvar_opt name tvmap with
+      match lookup_tyvar_opt name tvmap with
       | None ->
-        let tvmap = bind_typvar name key tvmap in
+        let tvmap = bind_tyvar name key tvmap in
         tvmap, name
       | Some _ ->
-        let name = next_free_typvar key tvmap in
-        let tvmap = bind_typvar name key tvmap in
+        let name = next_free_tyvar key tvmap in
+        let tvmap = bind_tyvar name key tvmap in
         tvmap, name
     in
     tvmap, "'(" ^ name ^ ", " ^ string_of_int key ^ ")"
@@ -302,7 +302,7 @@ let print_symtab symtab =
 (* Update pending types in tuple, function, and generics *)
 let rec update_pending symtab = function
   | Unit | Bool | Int | Char | String | Ref | Array as t -> t
-  | Typvar _ as t -> t
+  | Tyvar _ as t -> t
   | Tuple l -> Tuple (List.map (update_pending symtab) l)
   | Variants _ as t -> t
   | Record _ as t -> t
@@ -317,7 +317,7 @@ let rec update_pending symtab = function
 
 (* Resolve pending types inside variants, record, and interface *)
 let rec resolve_pending symtab = function
-  | Unit | Bool | Int | Char | String | Ref | Array | Typvar _ | Alias _ -> ()
+  | Unit | Bool | Int | Char | String | Ref | Array | Tyvar _ | Alias _ -> ()
   | Tuple l -> List.iter (resolve_pending symtab) l
   | Variants (_, l) ->
     let (resolve_variant : variant -> unit) = function
@@ -342,7 +342,7 @@ let rec resolve_pending symtab = function
 
 (* Filter types with pending inside *)
 let rec filter_pending = function
-  | Unit | Bool | Int | Char | String | Ref | Array | Typvar _ -> false
+  | Unit | Bool | Int | Char | String | Ref | Array | Tyvar _ -> false
   | Tuple l ->
     let rec iter = function
     | [] -> false
@@ -379,7 +379,7 @@ let rec check_datatype = function
   | Unit | Bool | Int | Char | String -> ()
   | Ref -> failwith "check_datatype: ref"
   | Array -> failwith "check_datatype: array"
-  | Typvar _ -> ()
+  | Tyvar _ -> ()
   | Tuple l -> List.iter check_datatype l
   | Variants (_, l) -> let aux = function
     | (_, None) -> ()
@@ -406,17 +406,17 @@ let rec check_datatype = function
 
 (* define list *)
 let list_type =
-  let typvar_for_list = new_typvar "a" in
+  let tyvar_for_list = new_tyvar "a" in
   let ref_to_cons =
-    let typvar = Typvar typvar_for_list in
-    ref (Tuple [typvar; Specific ([typvar], Pending "list")])
+    let tyvar = Tyvar tyvar_for_list in
+    ref (Tuple [tyvar; Specific ([tyvar], Pending "list")])
   in
   let list_nil = ("[]", None) in
   let list_cons = ("(::)", Some ref_to_cons) in
-  let variants = Variants (new_typvar_id (), [list_nil; list_cons]) in
-  let alias = Alias ("list", Generics (new_typvar_id (), [typvar_for_list], variants)) in
-  let typvar = Typvar typvar_for_list in
-  ref_to_cons := Tuple [typvar; Specific ([typvar], alias)];
+  let variants = Variants (new_tyvar_id (), [list_nil; list_cons]) in
+  let alias = Alias ("list", Generics (new_tyvar_id (), [tyvar_for_list], variants)) in
+  let tyvar = Tyvar tyvar_for_list in
+  ref_to_cons := Tuple [tyvar; Specific ([tyvar], alias)];
   alias
 
 let list_nil, list_cons =
@@ -425,10 +425,10 @@ let list_nil, list_cons =
   | _ -> failwith "list_type"
 
 (* define ref *)
-let ref_type = Alias ("ref", Generics (new_typvar_id (), [new_typvar "a"], Ref))
+let ref_type = Alias ("ref", Generics (new_tyvar_id (), [new_tyvar "a"], Ref))
 
 (* define array *)
-let array_type = Alias ("array", Generics (new_typvar_id (), [new_typvar "a"], Array))
+let array_type = Alias ("array", Generics (new_tyvar_id (), [new_tyvar "a"], Array))
 
 (* type table *)
 let default_symtab =
@@ -448,8 +448,8 @@ let default_symtab =
   (* let () = List.iter print default_type_list in *)
   (* save default values *)
   let default_value_list =
-    let typvar = Typvar (new_typvar "a") in
-    [("ref", Function (typvar, Specific ([typvar], ref_type)))] in
+    let tyvar = Tyvar (new_tyvar "a") in
+    [("ref", Function (tyvar, Specific ([tyvar], ref_type)))] in
   let default_values = make_string_map default_value_list in
   (* save default constructors *)
   let default_constructor_list =
@@ -568,13 +568,13 @@ and walk_type_binding symtab ((params_opt, name, construct): Ast.type_binding) =
   match params_opt with
   | None -> 
     walk_type_construct symtab tvtab construct
-  | Some typvars ->
-    let typvars = List.map (fun x -> new_typvar x) typvars in
+  | Some tyvars ->
+    let tyvars = List.map (fun x -> new_tyvar x) tyvars in
     let update_tvtab tvtab (name, id) =
-      bind_typvar name id tvtab in
-    let tvtab = List.fold_left update_tvtab tvtab typvars in
+      bind_tyvar name id tvtab in
+    let tvtab = List.fold_left update_tvtab tvtab tyvars in
     let typ = walk_type_construct symtab tvtab construct in
-    Generics (new_generic_id (), typvars, typ)
+    Generics (new_generic_id (), tyvars, typ)
 
 and walk_type_construct symtab tvtab = function
   | Ast.TypeExpr t -> walk_type_expr symtab tvtab t
@@ -591,15 +591,15 @@ and walk_type_op symtab tvtab is_decl =
       tvtab, (lookup_type name symtab : datatype)
     | Ast.TypeSymbol name ->
       if is_decl then
-        tvtab, Typvar (name, lookup_typvar name tvtab)
+        tvtab, Tyvar (name, lookup_tyvar name tvtab)
       else
-        match lookup_typvar_opt name tvtab with
+        match lookup_tyvar_opt name tvtab with
         | None ->
-          let id = new_typvar_id () in
-          let tvtab = bind_typvar name id tvtab in
-          tvtab, Typvar (name, id)
+          let id = new_tyvar_id () in
+          let tvtab = bind_tyvar name id tvtab in
+          tvtab, Tyvar (name, id)
         | Some id ->
-          tvtab, Typvar (name, id)
+          tvtab, Tyvar (name, id)
     )
   | Ast.TupleType l ->
     let rec iter tvtab acc = function
@@ -617,8 +617,8 @@ and walk_type_op symtab tvtab is_decl =
   | Ast.SpecificType (args, name) ->
     (* TODO: lack of type variables arity checking *)
     match lookup_type name symtab with
-    | Alias (name, Generics (_, typvars, _)) ->
-      if List.length args <> List.length typvars then
+    | Alias (name, Generics (_, tyvars, _)) ->
+      if List.length args <> List.length tyvars then
         raise (Type_arity_mismatch name)
       else
         let rec iter tvtab acc = function
@@ -662,10 +662,10 @@ exception Incompatible_types of string * string
 
 let rec apply_real_type tvtab = function
   | Unit | Bool | Int | Char | String | Ref | Array as t -> t
-  | Typvar (_, key) ->
+  | Tyvar (_, key) ->
     let tvtab, t = find_id key tvtab in
     (match t with
-    | Typvar (_, id) when id = key -> t
+    | Tyvar (_, id) when id = key -> t
     | _ -> apply_real_type tvtab t
     )
   | Tuple l ->
@@ -685,7 +685,7 @@ let rec apply_real_type tvtab = function
 
 let rec apply_generics tvtab = function
   | Unit | Bool | Int | Char | String | Ref | Array as t -> t
-  | Typvar (_, key) as typ ->
+  | Tyvar (_, key) as typ ->
     (match lookup_id key tvtab with
     | Some t -> t
     | None -> typ
@@ -695,13 +695,13 @@ let rec apply_generics tvtab = function
   | Variants _ | Record _ | Interface _ as t -> t
   | Function (arg, body) ->
     Function (apply_generics tvtab arg, apply_generics tvtab body)
-  | Specific (args, Alias (_, Generics (_, typvars, body))) as t ->
+  | Specific (args, Alias (_, Generics (_, tyvars, body))) as t ->
     (match body with
     | Variants _ | Record _ | Interface _ -> t
     | _ ->
       let args = List.map (apply_generics tvtab) args in
       let fold tvtab (_, key) arg = add_id key arg tvtab in
-      let tvtab = List.fold_left2 fold tvtab typvars args in
+      let tvtab = List.fold_left2 fold tvtab tyvars args in
       apply_generics tvtab body
     )
   | Alias (_, typ) -> apply_real_type tvtab typ
@@ -730,33 +730,33 @@ let rec agree_on_type tvtab dest src =
   | Ref, Ref | Array, Array -> tvtab
 
   (* union-find *)
-  | Typvar (_, id1), Typvar (_, id2) ->
+  | Tyvar (_, id1), Tyvar (_, id2) ->
     let tvtab, t1 = find_id id1 tvtab in
     let tvtab, t2 = find_id id2 tvtab in
     let tvtab = (match t1, t2 with
-    | Typvar (_, root1), Typvar (_, root2) when root1 = root2 ->
+    | Tyvar (_, root1), Tyvar (_, root2) when root1 = root2 ->
       tvtab
-    | t1, Typvar (_, root2) ->
+    | t1, Tyvar (_, root2) ->
       add_id root2 t1 tvtab
-    | Typvar (_, root1), t2 ->
+    | Tyvar (_, root1), t2 ->
       add_id root1 t2 tvtab
     | t1, t2 ->
       agree_on_type tvtab t1 t2
     ) in
     (* let () = print_value2 "**merged**" (apply_to_type tvtab t1) (apply_to_type tvtab t2) in *)
     tvtab
-  | d, Typvar (_, id) ->
+  | d, Tyvar (_, id) ->
     (* let () = print_endline "agree_on_type: dest type_var" in *)
     let tvtab, t = find_id id tvtab in
     (match t with
-    | Typvar (_, root) -> add_id root d tvtab
+    | Tyvar (_, root) -> add_id root d tvtab
     | _ -> agree_on_type tvtab d t
     )
-  | Typvar (_, id), s ->
+  | Tyvar (_, id), s ->
     (* let () = print_endline "agree_on_type: type_var src" in *)
     let tvtab, t = find_id id tvtab in
     (match t with
-    | Typvar (_, root) -> add_id root s tvtab
+    | Tyvar (_, root) -> add_id root s tvtab
     | _ -> agree_on_type tvtab t s
     )
 
@@ -823,29 +823,29 @@ let fold_symtab symtab (k, v) =
   let () = print_value k v in
   add_value k v symtab
 
-let make_typvars (typvars : typvar list) =
-  let idmapping = List.map (fun (name, id) -> id, Typvar (new_typvar name)) typvars in
+let make_tyvars (tyvars : tyvar list) =
+  let idmapping = List.map (fun (name, id) -> id, Tyvar (new_tyvar name)) tyvars in
   let idmap = Id_map.of_seq (List.to_seq idmapping) in
   let tvtab = {empty_tvtab with idmap} in
-  let _, typvars = List.split idmapping in
-  match typvars with
-  | [] -> failwith "walk_capident: make_typvars"
+  let _, tyvars = List.split idmapping in
+  match tyvars with
+  | [] -> failwith "walk_capident: make_tyvars"
   | l -> l, tvtab
 
-let rec substitute_typvars tvtab = function
+let rec substitute_tyvars tvtab = function
   | Unit | Bool | Int | Char | String | Ref | Array as t -> t
-  | Typvar (_, id) ->
+  | Tyvar (_, id) ->
     (match lookup_id id tvtab with
      | Some t -> t
-     | None -> failwith "substitute_typvars: id is not found")
-  | Tuple l -> Tuple (List.map (substitute_typvars tvtab) l)
+     | None -> failwith "substitute_tyvars: id is not found")
+  | Tuple l -> Tuple (List.map (substitute_tyvars tvtab) l)
   | Variants _ | Record _ | Interface _ | Generics _ as t -> t
-  | Function (arg, body) -> Function (substitute_typvars tvtab arg, substitute_typvars tvtab body)
+  | Function (arg, body) -> Function (substitute_tyvars tvtab arg, substitute_tyvars tvtab body)
   | Specific (args, body) ->
-    let args = List.map (substitute_typvars tvtab) args in
+    let args = List.map (substitute_tyvars tvtab) args in
     Specific (args, body)
-  | Alias (name, typ) -> Alias (name, substitute_typvars tvtab typ)
-  | _ -> failwith "substitute_typvars"
+  | Alias (name, typ) -> Alias (name, substitute_tyvars tvtab typ)
+  | _ -> failwith "substitute_tyvars"
 
 let rec walk_value_bindings symtab tvtab (r, l) =
   if r then (* recursive *)
@@ -936,12 +936,12 @@ and walk_capident symtab tvtab name =
   let typ =
     match typ with
     | Alias (_, Generics (_, var_names, _)) ->
-      let typvars, varmap = make_typvars var_names in
+      let tyvars, varmap = make_tyvars var_names in
       (match variant with
-      | name, None -> Specific (typvars, typ)
+      | name, None -> Specific (tyvars, typ)
       | name, Some arg ->
-        let arg = substitute_typvars varmap !arg in
-        Function (arg, Specific (typvars, typ))
+        let arg = substitute_tyvars varmap !arg in
+        Function (arg, Specific (tyvars, typ))
       )
     | t -> 
       (match variant with
@@ -964,8 +964,8 @@ and walk_assign symtab tvtab (v, e) =
   let tvtab, assignee = walk_variable symtab tvtab v in
   let tvtab, assigner = walk_expr symtab tvtab e in
   (match assignee with
-   | Specific ([typvar], typ) when typ = ref_type ->
-     let tvtab = agree_on_type tvtab typvar assigner in
+   | Specific ([tyvar], typ) when typ = ref_type ->
+     let tvtab = agree_on_type tvtab tyvar assigner in
      tvtab, Unit
    | _ -> failwith "walk_assign")
 
@@ -978,7 +978,7 @@ and walk_array symtab tvtab l =
   tvtab, Specific ([typ], array_type)
 
 and walk_item_list symtab tvtab l =
-  let acc_typ = Typvar (new_typvar "a") in
+  let acc_typ = Tyvar (new_tyvar "a") in
   let aux tvtab e =
     let tvtab, typ = walk_expr symtab tvtab e in
     agree_on_type tvtab acc_typ typ
@@ -992,8 +992,8 @@ and walk_record symtab l =
 and walk_call symtab tvtab (c, e) =
   let tvtab, caller = walk_expr symtab tvtab c in
   let tvtab, callee = walk_expr symtab tvtab e in
-  let arg = Typvar (new_typvar "a") in
-  let body = Typvar (new_typvar "a") in
+  let arg = Tyvar (new_tyvar "a") in
+  let body = Tyvar (new_tyvar "a") in
   let func_type = Function (arg, body) in
   let tvtab = agree_on_type tvtab func_type caller in
   let tvtab = agree_on_type tvtab arg callee in
@@ -1008,7 +1008,7 @@ and walk_unary symtab tvtab (op, e) =
     let tvtab = agree_on_type tvtab Int operand in
     tvtab, Int
   | Ast.Deref -> 
-    let typ = Typvar (new_typvar "a") in
+    let typ = Tyvar (new_tyvar "a") in
     let ref_typ = Specific ([typ], ref_type) in
     let tvtab = agree_on_type tvtab ref_typ operand in
     tvtab, typ
@@ -1033,7 +1033,7 @@ and walk_binary symtab tvtab (op, a, b) =
     let tvtab = agree_on_type tvtab list_typ b in
     tvtab, list_typ
   | Ast.Append ->
-    let list_typ = Specific ([Typvar (new_typvar "a")], lookup_type "list" symtab) in
+    let list_typ = Specific ([Tyvar (new_tyvar "a")], lookup_type "list" symtab) in
     let tvtab = agree_on_type tvtab list_typ a in
     let tvtab = agree_on_type tvtab list_typ b in
     tvtab, list_typ
@@ -1061,7 +1061,7 @@ and walk_if_expr symtab tvtab (cond, then_e, else_opt) =
 
 and walk_match_expr symtab tvtab (e, l) =
   let tvtab, acc_pattern = walk_expr symtab tvtab e in
-  let acc_body = Typvar (new_typvar "a") in
+  let acc_body = Tyvar (new_tyvar "a") in
   let () = print_value "[body]" acc_body in
   let aux tvtab (pattern, body) =
     let bindings, tvtab, pattern = walk_pattern symtab tvtab pattern in
@@ -1117,12 +1117,12 @@ and walk_pattern symtab tvtab = function
     let bindings, tvtab, typ = walk_pattern symtab tvtab p in
     bindings, tvtab, Specific ([typ], ref_type)
   | Ast.VariablePattern name ->
-    let typ = Typvar (new_typvar "a") in
+    let typ = Tyvar (new_tyvar "a") in
     let () = print_value ("<" ^ name ^ ">") typ in
     let binding = (name, typ) in
     [binding], tvtab, typ
   | Ast.Wildcard ->
-    let typ = Typvar (new_typvar "a") in
+    let typ = Tyvar (new_tyvar "a") in
     let () = print_value "_" typ in
     [], tvtab, typ
   | Ast.VariantsPattern (name, p) ->
@@ -1136,7 +1136,7 @@ and walk_pattern symtab tvtab = function
     bindings, tvtab, t_typ
 
 and walk_pattern_item_list symtab tvtab l =
-  let acc_typ = Typvar (new_typvar "a") in
+  let acc_typ = Tyvar (new_tyvar "a") in
   let rec iter bindings tvtab = function
   | [] -> bindings, tvtab
   | p :: l ->
@@ -1153,25 +1153,25 @@ and walk_record_pattern symtab tvtab l =
 and walk_variant_pattern symtab tvtab (name, pattern_opt) =
   let variant, typ = lookup_constructor name symtab in
   match typ with
-  | Alias (_, Generics (_, typvars, t)) ->
-    let typvars, varmap = make_typvars typvars in
+  | Alias (_, Generics (_, tyvars, t)) ->
+    let tyvars, varmap = make_tyvars tyvars in
     (match pattern_opt with
      | None -> 
-       [], tvtab, Specific (typvars, typ)
+       [], tvtab, Specific (tyvars, typ)
      | Some p ->
        let bindings, tvtab, pattern_typ = walk_pattern symtab tvtab p in
        let variant_typ = match variant with
          | (name, None) -> raise (Type_arity_mismatch name)
-         | (name, Some {contents=typ}) -> substitute_typvars varmap typ
+         | (name, Some {contents=typ}) -> substitute_tyvars varmap typ
        in
        let tvtab = agree_on_type tvtab variant_typ pattern_typ in
-       bindings, tvtab, Specific (typvars, typ))
+       bindings, tvtab, Specific (tyvars, typ))
   | _ ->
     [], tvtab, typ
 
 
 and walk_pattern_list symtab tvtab l =
-  let acc_typ = Typvar (new_typvar "a") in
+  let acc_typ = Tyvar (new_tyvar "a") in
   let rec iter bindings_list tvtab = function
   | [] -> bindings_list, tvtab
   | p :: l ->
