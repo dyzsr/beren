@@ -4,6 +4,7 @@ type ('a, 'b) result =
   | Ok of 'a
   | Error of 'b
 
+(*
 type 'a list =
   | Nil
   | Cons of 'a * 'a list
@@ -17,6 +18,7 @@ let length l =
     | Nil => acc
     | Cons (_, t) => aux (acc + 1) t
   in aux 0 l
+*)
 
 type int_list = int list
 

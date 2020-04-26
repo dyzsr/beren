@@ -45,12 +45,12 @@ and pattern =
   | TuplePattern of pattern list (* (?, ?, ...) *)
   | ListPattern of pattern list (* [?, ?, ...] *)
   | ConsPattern of pattern * pattern (* ? :: ? *)
-  | ArrayPattern of pattern list (* #[?, ?, ...] *)
+  | ArrayPattern of pattern list (* [|?, ?, ...|] *)
   | RecordPattern of record_pattern (* {?=?, ...} *)
   | VariablePattern of string (* id *)
   | RefPattern of pattern
   | Wildcard
-  | VariantsPattern of string (* constructor *) * pattern option (* value *)
+  | VariantPattern of string (* constructor *) * pattern option (* value *)
   | PatternList of pattern list
   | PatternWithType of pattern * type_expr
 
@@ -210,7 +210,7 @@ and pattern_to_rep = function
   | VariablePattern v -> OneLine ("variable-pattern", v) (* id *)
   | RefPattern p -> ManyLines ("ref-pattern", [pattern_to_rep p])
   | Wildcard -> OneLine ("wildcard", "_")
-  | VariantsPattern (name, pat_opt) -> begin
+  | VariantPattern (name, pat_opt) -> begin
     match pat_opt with
       | None -> OneLine ("variant-pattern", name)
       | Some p -> ManyLines ("variant-pattern", [OneLine ("name", name); pattern_to_rep p])

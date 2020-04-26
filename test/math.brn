@@ -19,3 +19,17 @@ let rec expt a n =
   if n % 2 = 0 then expt (a*a) (n/2) else
   a * expt a (n - 1)
 
+let println_int x =
+  let () = print_int x in
+  print_endline ""
+
+let () =
+  let () = println_int (abs 10) in
+  let () = println_int (abs (-123)) in
+  let () = println_int (min 123 456) in
+  let () = println_int (max 123 456) in
+  let () = println_int (gcd 48 64) in
+  let () = println_int (fact 10) in
+  let () = println_int (expt 2 16) in
+  ()
+

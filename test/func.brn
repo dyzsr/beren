@@ -13,3 +13,6 @@ let fo = foo ()
 
 let rec f x = x
 and g () = f 1
+
+let ff x = x
+and gg = ff 1

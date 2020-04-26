@@ -21,14 +21,16 @@ rule lex = parse
   | ".numvars"    { NUMVARS }
   | ".func"       { FUNC }
   | ".entry"      { ENTRY }
-  | "$"           { DLR }
+  | ".body"       { BODY }
+  | "_"           { WILDCARD }
   | "("           { LPAR }
   | ")"           { RPAR }
   | ","           { COMMA }
   | "#'"          { lex_char [] lexbuf }
   | "\""          { lex_string [] lexbuf }
-  | digit+ as lxm { INT (int_of_string lxm) }
-  | ("_" | alpha) alnum* as lxm { ID lxm }
+  | "true" | "false" as lxm     { BOOL (bool_of_string lxm) }
+  | ("+" | "-")? digit+ as lxm  { INT (int_of_string lxm) }
+  | ("#" | "_" | alpha) alnum* as lxm { ID lxm }
   | "." alpha alnum* as lxm     { LABEL lxm }
 
 and lex_char acc = parse

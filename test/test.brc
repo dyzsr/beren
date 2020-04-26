@@ -1,0 +1,79 @@
+.external
+  0, print_bool
+  1, print_int
+  2, print_char
+  3, print_string
+  4, print_endline
+
+.global
+  0, abs
+
+.func 0, #fun_0
+.numvars 8
+.body
+  getarg local(1, #var_1)
+  move local(0, n) local(1, #var_1)
+  move local(4, #var_4) local(0, n)
+  loadint local(5, #var_5) 0
+  gte local(3, #var_3) local(4, #var_4) local(5, #var_5)
+  loadbool local(7, #var_7) true
+  eq _ local(3, #var_3) local(7, #var_7)
+  jmpfalse .L2
+  move local(2, #var_2) local(0, n)
+  jmp .L1
+.L2
+  move local(6, #var_6) local(0, n)
+  intneg local(2, #var_2) local(6, #var_6)
+.L1
+  setret local(2, #var_2)
+  ret
+
+.func 1, #init_1
+.numvars 2
+.body
+  makefunc 0, #fun_0 local(0, #var_0)
+  move local(1, abs) local(0, #var_0)
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(0, abs) local(1, abs)
+  ret
+
+.func 2, #init_2
+.numvars 8
+.body
+  move local(2, #var_2) global(0, abs)
+  loadint local(3, #var_3) 10
+  setarg local(3, #var_3)
+  call local(2, #var_2)
+  getret local(1, #var_1)
+  move local(4, a) local(1, #var_1)
+  jmp .L3
+.L2
+  crash
+.L3
+  move local(5, #var_5) external(1, print_int)
+  move local(6, #var_6) local(4, a)
+  setarg local(6, #var_6)
+  call local(5, #var_5)
+  getret local(0, #var_0)
+  loadunit local(7, #var_7)
+  eq _ local(7, #var_7) local(0, #var_0)
+  jmpfalse .L0
+  jmp .L1
+.L0
+  crash
+.L1
+  ret
+
+.entry
+.numvars 2
+.body
+  makefunc 1, #init_1 local(0, #var_0)
+  call local(0, #var_0)
+  makefunc 2, #init_2 local(1, #var_1)
+  call local(1, #var_1)
+  ret
+
+

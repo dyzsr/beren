@@ -9,7 +9,7 @@
   0, gcd
 
 .numvars 1
-.func gcd
+.func 0, gcd
   loadstr $(3, 0, s) "abc"
   setarg $(3, 0, s)
   call $(0, 4, print_endline)

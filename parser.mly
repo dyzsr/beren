@@ -213,7 +213,7 @@ type_specialization:
 
 type_arguments:
     t=highest_prec_type_expr { [t] }
-  | "(" l=type_argument_list ")" { l }
+  | "(" t=type_expr "," l=type_argument_list ")" { t :: l }
 
 type_argument_list:
     t=type_expr { [t] }
@@ -251,7 +251,7 @@ match_branch:
 lambda_expr:
     e=fun_expr { e }
   | e=function_expr
-    { let name = "[arg]" in
+    { let name = "#arg" in
       let arg = VariablePattern name in
       let body = MatchExpr (Variable (None, name), e) in
       LambdaExpr (arg, body)
@@ -353,11 +353,11 @@ variable_pattern:
   | WILDCARD { Wildcard }
 
 variant_pattern:
-    cid=CAPID { VariantsPattern (cid, None) }
+    cid=CAPID { VariantPattern (cid, None) }
 
 variant_with_value_pattern:
-    cid=CAPID p=pattern_terminal { VariantsPattern (cid, Some p) }
-  | cid=CAPID "(" p=pattern ")" { VariantsPattern (cid, Some p) }
+    cid=CAPID p=pattern_terminal { VariantPattern (cid, Some p) }
+  | cid=CAPID "(" p=pattern ")" { VariantPattern (cid, Some p) }
 
 ref_pattern:
     "!" p=pattern_terminal { RefPattern p }

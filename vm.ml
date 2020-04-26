@@ -1,34 +1,60 @@
+open Utils
+
 (* Variables *)
 type nameid = int * string
+
+let text_nameid (id, name) =
+  string_of_int id ^ ", " ^ name
 
 type var =
   | External of nameid
   | Global of nameid
   | Outer of nameid
   | Local of nameid
+  | Wildcard
 
+exception Invalid_var_type of string
+let make_var (n, name) = function
+  | "external" -> External (n, name)
+  | "global" -> Global (n, name)
+  | "outer" -> Outer (n, name)
+  | "local" -> Local (n, name)
+  | _ -> raise (Invalid_var_type name)
 
-(* Instructions *)
-module String_map = Map.Make (String)
+let text_var = function
+  | External (id, name) -> "external(" ^ text_nameid (id, name) ^ ")"
+  | Global (id, name) -> "global(" ^ text_nameid (id, name) ^ ")"
+  | Outer (id, name) -> "outer(" ^ text_nameid (id, name) ^ ")"
+  | Local (id, name) -> "local(" ^ text_nameid (id, name) ^ ")"
+  | Wildcard -> "_"
 
-let get m name =
-  String_map.find name m
+(* Instruction set *)
+
+let get_nameid m name =
+  Name_map.find name m
 
 let to_map l =
-  String_map.of_seq (List.to_seq l)
+  Name_map.of_seq (List.to_seq l)
 
 type label = string
 
 type op_single =
   | Ret
   | Nop
+  | Crash
 
 let cmd_single =
   let mapping =
     [ "ret", Ret
     ; "nop", Nop
+    ; "crash", Crash
     ] in
-  get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_single = function
+  | Ret -> "ret"
+  | Nop -> "nop"
+  | Crash -> "crash"
 
 type op_jmp =
   | JmpTrue | JmpFalse | Jmp
@@ -39,22 +65,29 @@ let cmd_jmp =
     ; "jmpfalse", JmpFalse
     ; "jmp", Jmp
     ] in
-  get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_jmp = function
+  | JmpTrue -> "jmptrue"
+  | JmpFalse -> "jmpfalse"
+  | Jmp -> "jmp"
 
 type op_decl =
-  | MakeFunc | MakeClosure
+  | MakeFunc
 
 let cmd_decl =
   let mapping = 
     [ "makefunc", MakeFunc
-    ; "makeclos", MakeClosure
     ] in
-  get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_decl = function
+  | MakeFunc -> "makefunc"
 
 type op_v =
   | LoadUnit
   | SetArg | GetRet | GetArg | SetRet | Call
-  | SetVal | PushPart | PushField | Capture
+  | SetVal | PushPart | PushField
   | MakeTuple | MakeVariant | MakeRecord
 
 let cmd_v =
@@ -68,12 +101,25 @@ let cmd_v =
     ; "setval", SetVal
     ; "pushpart", PushPart
     ; "pushfield", PushField
-    ; "capture", Capture
     ; "maketuple", MakeTuple
     ; "makevariant", MakeVariant
     ; "makerecord", MakeRecord
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_v = function
+  | LoadUnit -> "loadunit"
+  | SetArg ->  "setarg" 
+  | GetRet ->  "getret" 
+  | GetArg ->  "getarg" 
+  | SetRet ->  "setret" 
+  | Call -> "call"
+  | SetVal -> "setval"
+  | PushPart -> "pushpart"
+  | PushField -> "pushfield"
+  | MakeTuple -> "maketuple"
+  | MakeVariant -> "makevariant"
+  | MakeRecord -> "makerecord"
 
 type op_i =
   | SetNum
@@ -82,7 +128,10 @@ let cmd_i =
   let mapping =
     [ "setnum", SetNum
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_i = function
+  | SetNum -> "setnum"
 
 type op_vb = LoadBool
 
@@ -90,7 +139,10 @@ let cmd_vb =
   let mapping =
     [ "loadbool", LoadBool
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vb = function
+  | LoadBool -> "loadbool"
 
 type op_vi =
   | LoadInt
@@ -99,7 +151,10 @@ let cmd_vi =
   let mapping =
     [ "loadint", LoadInt
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vi = function
+  | LoadInt -> "loadint"
 
 type op_vc = LoadChar
 
@@ -107,7 +162,10 @@ let cmd_vc =
   let mapping =
     [ "loadchar", LoadChar
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vc = function
+  | LoadChar -> "loadchar"
 
 type op_vs = LoadStr
 
@@ -115,25 +173,40 @@ let cmd_vs =
   let mapping =
     [ "loadstr", LoadStr
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vs = function
+  | LoadStr -> "loadstr"
 
 type op_vv =
-  | Move | Assign | Deref
+  | Move | SetRef | Deref
   | VariantNum | VariantVal
+  | IntNeg
   | StrLen
   | BoolNot
 
 let cmd_vv =
   let mapping =
     [ "move", Move
-    ; "assign", Assign
+    ; "setref", SetRef
     ; "deref", Deref
-    ; "variantnum", VariantNum
-    ; "variantval", VariantVal
+    ; "vrnum", VariantNum
+    ; "vrval", VariantVal
+    ; "intneg", IntNeg
     ; "strlen", StrLen
     ; "boolnot", BoolNot
     ] in
-    get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vv = function
+  | Move -> "move"
+  | SetRef -> "setref"
+  | Deref -> "deref"
+  | VariantNum -> "vrnum"
+  | VariantVal -> "vrval"
+  | IntNeg -> "intneg"
+  | StrLen -> "strlen"
+  | BoolNot -> "boolnot"
 
 type op_vvv =
   | IntAdd | IntSub | IntMul | IntDiv | IntMod
@@ -161,17 +234,41 @@ let cmd_vvv =
     ; "strget", StrGet
     ; "select", Select
     ] in
-  get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vvv = function
+  | IntAdd -> "intadd"
+  | IntSub -> "intsub"
+  | IntMul -> "intmul"
+  | IntDiv -> "intdiv"
+  | IntMod -> "intmod"
+  | BoolAnd -> "booland"
+  | BoolOr -> "boolor"
+  | Lt -> "lt"
+  | Lte -> "lte"
+  | Gt -> "gt"
+  | Gte -> "gte"
+  | Eq -> "eq"
+  | Neq -> "neq"
+  | StrCat -> "strcat"
+  | StrGet -> "strget"
+  | Select -> "select"
 
 type op_vvi =
-  | TuplePart | RecordField
+  | TuplePart | RecordField | Capture
 
 let cmd_vvi =
   let mapping =
     [ "tuplepart", TuplePart
     ; "recordfield", RecordField
+    ; "capture", Capture
     ] in
-  get (to_map mapping)
+  get_nameid (to_map mapping)
+
+let text_vvi = function
+  | TuplePart -> "tuplepart"
+  | RecordField -> "recordpart"
+  | Capture -> "capture" 
 
 (* SSA form *)
 
@@ -182,7 +279,7 @@ and ssa =
   | L of label
   | S of op_single
   | J of op_jmp * target
-  | D of op_decl * int * string * var
+  | D of op_decl * nameid * var
   | V of op_v * var
   | I of op_i * int
   | VB of op_vb * var * bool
@@ -198,19 +295,67 @@ and target =
   ; mutable pos : pos
   }
 
+let make_target label =
+  { label = label
+  ; pos = []
+  }
+
 let make_l label = L label
 let make_s op_name = S op_name
 
+let text_ssa = function
+  | L l -> l
+  | S op ->
+    "  " ^ text_single op
+  | J (op, target) ->
+    "  " ^ text_jmp op ^ " " ^ target.label
+  | D (op, nameid, v) ->
+    "  " ^ text_decl op ^ " " ^ text_nameid nameid ^ " " ^ text_var v
+  | V (op, v) ->
+    "  " ^ text_v op ^ " " ^ text_var v
+  | I (op, i) ->
+    "  " ^ text_i op ^ " " ^ string_of_int i
+  | VB (op, v, b) ->
+    "  " ^ text_vb op ^ " " ^ text_var v ^ " " ^ string_of_bool b
+  | VI (op, v, i) ->
+    "  " ^ text_vi op ^ " " ^ text_var v ^ " " ^ string_of_int i
+  | VC (op, v, c) ->
+    "  " ^ text_vc op ^ " " ^ text_var v ^ " #'" ^ String.make 1 c ^ "'"
+  | VS (op, v, s) ->
+    "  " ^ text_vs op ^ " " ^ text_var v ^ " \"" ^ s ^ "\""
+  | VV (op, va, vb) ->
+    "  " ^ text_vv op ^ " " ^ text_var va ^ " " ^ text_var vb
+  | VVV (op, dest, va, vb) ->
+    "  " ^text_vvv op ^ " " ^ text_var dest ^ " " ^ text_var va ^ " " ^ text_var vb
+  | VVI (op, dest, v, i) ->
+    "  " ^ text_vvi op ^ " " ^ text_var dest ^ " " ^ text_var v ^ " " ^ string_of_int i
+
+let text_proc l =
+  let texts = List.map text_ssa l in
+  String.concat "\n" texts ^ "\n"
+
 (* Intermediate represetations *)
-
-type captured = nameid array
-
 type func =
-  { captured : captured option
+  { id : nameid
+  ; captured : nameid array
   (* ; prototype : unit *)
   ; nvars : int
   ; proc : proc
   }
+
+let text_func func =
+  let nameid = ".func " ^ text_nameid func.id ^ "\n" in
+  let captured = match Array.length func.captured with
+    | 0 -> ""
+    | _ ->
+      let indent x = "  " ^ text_nameid x ^ "\n" in
+      let capts = Array.map indent func.captured in
+      let text = Array.fold_left (^) "" capts in
+      ".captured\n" ^ text
+  in
+  let nvars = ".numvars " ^ string_of_int func.nvars ^ "\n" in
+  let proc = ".body\n" ^ text_proc func.proc ^ "\n" in
+  nameid ^ captured ^ nvars ^ proc
 
 type program =
   { exts : nameid array
@@ -218,6 +363,63 @@ type program =
   ; funcs : func array
   ; entry : func
   }
+
+let text_program program =
+  let indent x = "  " ^ text_nameid x ^ "\n" in
+  let exts =
+    if Array.length program.exts = 0 then "" else
+    let text = Array.fold_left (^) "" (Array.map indent program.exts) in
+    ".external\n" ^ text ^ "\n"
+  in
+  let globs =
+    if Array.length program.globs = 0 then "" else
+    let text = Array.fold_left (^) "" (Array.map indent program.globs) in
+    ".global\n" ^ text ^ "\n"
+  in
+  let funcs = Array.fold_left (^) "" (Array.map text_func program.funcs) in
+  let entry =
+    let nvars = ".numvars " ^ string_of_int program.entry.nvars ^ "\n" in
+    let proc = ".body\n" ^ text_proc program.entry.proc ^ "\n" in
+    ".entry\n" ^ nvars ^ proc ^ "\n"
+  in
+  exts ^ globs ^ funcs ^ entry
+
+
+exception Duplicate_label of string
+let add_label m label pos =
+  let f = function
+  | None -> Some pos
+  | Some _ -> raise (Duplicate_label label)
+  in
+  Name_map.update label f m
+
+exception Undefined_label of string
+let resolve_target m ({label} as target) =
+  match Name_map.find_opt label m with
+  | None -> raise (Undefined_label label)
+  | Some pos -> target.pos <- pos
+
+let link_labels func =
+  let rec collect m = function
+  | [] -> m
+  | ssa :: l as pos ->
+    let m = match ssa with
+    | L label -> add_label m label pos
+    | _ -> m
+    in
+    collect m l
+  in
+  let map = collect Name_map.empty func.proc in
+  let rec resolve = function
+  | [] -> ()
+  | ssa :: l ->
+    let () = match ssa with
+    | J (_, target) -> resolve_target map target
+    | _ -> ()
+    in
+    resolve l
+  in
+  resolve func.proc
 
 (* Runtime values *)
 type value =
@@ -232,9 +434,29 @@ type value =
   | Array of value array
   | Variant of int * value
   | Record of value array
-  | Function of func
-  | Closure of value array * func
+  | Function of funcval
   | Builtin of nameid
+
+and funcval = {capts: value array; func: func}
+
+let rec string_of_value = function
+  | Nil -> "nil"
+  | Unit -> "()"
+  | Bool b -> "bool " ^ string_of_bool b
+  | Int i -> "int " ^ string_of_int i
+  | Char c -> "char '" ^ String.make 1 c ^ "'"
+  | String s -> "string \"" ^ s ^"\""
+  | Ref {contents=v} -> "ref " ^ string_of_value v
+  | Tuple l ->
+    let strs = Array.map string_of_value l in
+    let str = String.concat ", " (Array.to_list strs) in
+    "(" ^ str ^ ")"
+  | Array l -> failwith "string_of_value"
+  | Variant (i, v) ->
+    "variant (" ^ string_of_int i ^ ", " ^ string_of_value v ^ ")"
+  | Record _ -> failwith "string_of_value"
+  | Function _ -> "function"
+  | Builtin (id, name) -> "builtin: " ^ name
 
 exception Not_a_unit
 let get_unit = function Unit -> () | _ -> raise Not_a_unit
@@ -255,7 +477,7 @@ exception Not_a_tuple
 let get_tuple = function Tuple v -> v | _ -> raise Not_a_tuple
 
 exception Not_a_variant
-let get_variant = function Variant (num, value) -> (num, value) | _ -> raise Not_a_variant
+let get_variant = function Variant (n, v) -> (n, v) | _ -> raise Not_a_variant
 
 exception Not_a_record
 let get_record = function Record v -> v | _ -> raise Not_a_record
@@ -264,19 +486,20 @@ exception Not_a_ref
 let get_ref = function Ref v -> v | _ -> raise Not_a_ref
 
 exception Not_a_function
+let get_func = function Function f -> f | _ -> raise Not_a_function
 
-exception Not_same_kind
+exception Not_same_kind of string * string
 let same_kind = function
-  | Unit, Unit | Bool _, Bool _ | Int _, Int _ | Char _, Char _ | String _, String _
-  | Ref _, Ref _ | Tuple _, Tuple _ | Variant _, Variant _ | Record _, Record _
-  | Function _, Function _ | Closure _, Closure _ -> ()
-  | _, _ -> raise Not_same_kind
+  | Unit, Unit | Bool _, Bool _ | Int _, Int _ | Char _, Char _
+  | String _, String _ | Ref _, Ref _ | Tuple _, Tuple _
+  | Variant _, Variant _ | Record _, Record _ | Function _, Function _ -> ()
+  | v1, v2 -> raise (Not_same_kind (string_of_value v1, string_of_value v2))
 
 (* Call frame & stack *)
 type frame =
   { func : func
   ; vars : value array
-  ; captured : value array
+  ; capts : value array
   ; arg : value
   ; mutable pos : pos
   ; mutable ret : value
@@ -284,22 +507,20 @@ type frame =
 
 type callstack = frame list
 
-exception Captured_number_mismatch
+exception Captured_number_mismatch of int * int
 
-let new_frame func arg captured =
+let new_frame (func, arg, captured) =
   let {captured=capvars; nvars; proc=pos} = func in
-  let capnum = match capvars with
-  | None -> 0
-  | Some x -> Array.length x
-  in
-  if Array.length captured <> capnum then
-    raise Captured_number_mismatch;
+  let capnum = Array.length capvars in
+  let captnum = Array.length captured in
+  if captnum <> capnum then
+    raise (Captured_number_mismatch (captnum, capnum));
   { func = func
   ; pos = pos
   ; arg = arg
   ; ret = Nil
   ; vars = Array.make nvars Nil
-  ; captured = captured
+  ; capts = captured
   }
 
 (* The virtual machine *)
@@ -333,24 +554,23 @@ let next_ssa m =
 let get_var m = function
   | External (id, _) -> Builtin m.bltins.(id)
   | Global (id, _) -> m.gvars.(id)
-  | Outer (id, _) -> m.frame.captured.(id)
   | Local (id, _) -> m.frame.vars.(id)
+  | Outer (id, _) -> m.frame.capts.(id)
+  | Wildcard -> failwith "get_var"
 
 let set_var m v = function
   | External (id, _) -> raise Invalid_operation
   | Global (id, _) -> m.gvars.(id) <- v
-  | Outer (id, _) -> m.frame.captured.(id) <- v
   | Local (id, _) -> m.frame.vars.(id) <- v
+  | Outer (id, _) -> failwith "set_var: outer"
+  | Wildcard -> ()
 
-let call_func m func =
-  let frame = new_frame func m.arg [||] in
-  m.frame.pos <- m.pc;
-  m.stack <- m.frame :: m.stack;
-  m.frame <- frame;
-  m.pc <- frame.func.proc
-
-let call_closure m (captured, func) =
-  let frame = new_frame func m.arg captured in
+let call_func m ({capts; func} : funcval) =
+  (* let () =
+    let _, name = func.id in
+    print_endline ("call " ^ name)
+  in *)
+  let frame = new_frame (func, m.arg, capts) in
   m.frame.pos <- m.pc;
   m.stack <- m.frame :: m.stack;
   m.frame <- frame;
@@ -363,6 +583,10 @@ let bltin_funcs =
   ; 3, "print_string"
   ; 4, "print_endline"
   |]
+
+let externals =
+  let f (i, x) = x, (i, x) in
+  Name_map.of_seq (Array.to_seq (Array.map f bltin_funcs))
 
 let call_builtin m (id, name) =
   (match id with
@@ -381,7 +605,7 @@ let create program =
   let globs = program.globs in
   let gvars = Array.make (Array.length globs) Nil in
   let entry = program.entry in
-  let frame = new_frame entry Nil [||] in
+  let frame = new_frame (entry, Nil, [||]) in
   { program = program
   ; gvars = gvars
   ; bltins = bltin_funcs
@@ -403,19 +627,45 @@ let rec run (m : machine) =
   | [] -> failwith "run"
   | ssa :: rest ->
     match ssa with
-    | L _ -> (); next_ssa m
-    | S op -> run_s m op
-    | J (op, pos) -> run_j m (op, pos)
-    | D (op, id, s, var) -> run_d m (op, id, s, var)
-    | V (op, var) -> run_v m (op, var)
-    | I (op, i) -> run_i m (op, i)
-    | VB (op, var, b) -> run_vb m (op, var, b)
-    | VI (op, var, i) -> run_vi m (op, var, i)
-    | VC (op, var, c) -> run_vc m (op, var, c)
-    | VS (op, var, s) -> run_vs m (op, var, s)
-    | VV (op, va, vb) -> run_vv m (op, va, vb)
-    | VVV (op, dest, va, vb) -> run_vvv m (op, dest, va, vb)
-    | VVI (op, dest, var, i) -> run_vvi m (op, dest, var, i)
+    | L _ ->
+      (* print_endline (text_ssa ssa); *)
+      (); next_ssa m
+    | S op ->
+      (* print_endline (text_ssa ssa); *)
+      run_s m op
+    | J (op, pos) ->
+      (* print_endline (text_ssa ssa); *)
+      run_j m (op, pos)
+    | D (op, nameid, var) ->
+      (* print_endline (text_ssa ssa); *)
+      run_d m (op, nameid, var)
+    | V (op, var) ->
+      (* print_endline (text_ssa ssa); *)
+      run_v m (op, var)
+    | I (op, i) ->
+      (* print_endline (text_ssa ssa); *)
+      run_i m (op, i)
+    | VB (op, var, b) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vb m (op, var, b)
+    | VI (op, var, i) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vi m (op, var, i)
+    | VC (op, var, c) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vc m (op, var, c)
+    | VS (op, var, s) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vs m (op, var, s)
+    | VV (op, va, vb) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vv m (op, va, vb)
+    | VVV (op, dest, va, vb) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vvv m (op, dest, va, vb)
+    | VVI (op, dest, var, i) ->
+      (* print_endline (text_ssa ssa); *)
+      run_vvi m (op, dest, var, i)
 
 and run_s m = function
   | Ret ->
@@ -429,6 +679,7 @@ and run_s m = function
       m.pc <- next_pos frame.pos
     )
   | Nop -> next_ssa m
+  | Crash -> failwith "crash"
 
 and run_j m (op, target) =
   match op with
@@ -441,13 +692,12 @@ and run_j m (op, target) =
   | Jmp ->
     m.pc <- target.pos
 
-and run_d m (op, src_id, _, var) =
+and run_d m (op, (src_id, _), var) =
   (match op with
   | MakeFunc ->
-    set_var m (Function m.program.funcs.(src_id)) var
-  | MakeClosure ->
-    let captured = Array.of_list m.captured in
-    set_var m (Closure (captured, m.program.funcs.(src_id))) var
+    let func = m.program.funcs.(src_id) in
+    let capts = Array.make (Array.length func.captured) Nil in
+    set_var m (Function {capts; func}) var
   );
   next_ssa m
 
@@ -460,8 +710,7 @@ and run_v m (op, var) =
   | SetRet -> m.frame.ret <- get_var m var; next_ssa m
   | Call ->
     (match get_var m var with
-    | Function func -> call_func m func
-    | Closure (captured, func) -> call_closure m (captured, func)
+    | Function f -> call_func m f
     | Builtin (id, name) -> call_builtin m (id, name)
     | _ -> raise Not_a_function
     )
@@ -472,8 +721,6 @@ and run_v m (op, var) =
     m.tuple <- get_var m var :: m.tuple; next_ssa m
   | PushField ->
     m.record <- get_var m var :: m.record; next_ssa m
-  | Capture ->
-    m.captured <- get_var m var :: m.captured; next_ssa m
   | MakeTuple ->
     set_var m (Tuple (Array.of_list m.tuple)) var; next_ssa m
   | MakeVariant ->
@@ -485,8 +732,8 @@ and run_v m (op, var) =
 and run_i m (op, i) =
   (match op with
   | SetNum ->
-    let (_, value) = m.variant in
-    m.variant <- (i, value)
+    let (_, _) = m.variant in
+    m.variant <- (i, Nil)
   );
   next_ssa m
 
@@ -517,7 +764,7 @@ and run_vs m (op, var, s) =
 and run_vv m (op, va, vb) =
   (match op with
   | Move -> set_var m (get_var m vb) va
-  | Assign ->
+  | SetRef ->
     let value = get_ref (get_var m va) in
     value := get_var m vb
   | Deref ->
@@ -529,6 +776,9 @@ and run_vv m (op, va, vb) =
   | VariantVal ->
     let (_, value) = get_variant (get_var m vb) in
     set_var m value vb
+  | IntNeg ->
+    let i = get_int (get_var m vb) in
+    set_var m (Int (-i)) va
   | StrLen ->
     let s = get_string (get_var m vb) in
     set_var m (Int (String.length s)) va
@@ -551,12 +801,12 @@ and run_vvv m (op, dest, va, vb) =
     | IntMod -> Int (get_int a mod get_int b)
     | BoolAnd -> Bool (get_bool a && get_bool b)
     | BoolOr -> Bool (get_bool a || get_bool b)
-    | Lt -> same_kind (a, b); let b = get_int a < get_int b in m.cond <- b; Bool b
-    | Lte -> same_kind (a, b); let b = (get_int a <= get_int b) in m.cond <- b; Bool b
-    | Gt -> same_kind (a, b); let b = (get_int a > get_int b) in m.cond <- b; Bool b
-    | Gte -> same_kind (a, b); let b = (get_int a >= get_int b) in m.cond <- b; Bool b
-    | Eq -> same_kind (a, b); let b = (get_int a = get_int b) in m.cond <- b; Bool b
-    | Neq -> same_kind (a, b); let b = (get_int a <> get_int b) in m.cond <- b; Bool b
+    | Lt -> same_kind (a, b); let b = a < b in m.cond <- b; Bool b
+    | Lte -> same_kind (a, b); let b = a <= b in m.cond <- b; Bool b
+    | Gt -> same_kind (a, b); let b = a > b in m.cond <- b; Bool b
+    | Gte -> same_kind (a, b); let b = a >= b in m.cond <- b; Bool b
+    | Eq -> same_kind (a, b); let b = a = b in m.cond <- b; Bool b
+    | Neq -> same_kind (a, b); let b = a <> b in m.cond <- b; Bool b
     | StrCat -> String (get_string a ^ get_string b)
     | StrGet -> Char (get_string a).[get_int b]
     | Select ->
@@ -578,5 +828,8 @@ and run_vvi m (op, dest, var, i) =
   | RecordField ->
     let record = get_record (get_var m var) in
     set_var m record.(i) dest
+  | Capture ->
+    let {capts}:funcval = get_func (get_var m dest) in
+    capts.(i) <- get_var m var
   );
   next_ssa m

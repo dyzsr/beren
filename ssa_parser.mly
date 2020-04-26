@@ -1,59 +1,16 @@
 %{
+  open Utils
   open Vm
-
-  exception Invalid_var_type of string
-  let make_var (n, name) = function
-    | 0 -> External (n, name)
-    | 1 -> Global (n, name)
-    | 2 -> Outer (n, name)
-    | 3 -> Local (n, name)
-    | _ -> raise (Invalid_var_type name)
-
-  exception Duplicate_label of string
-  let add_label m label pos =
-    let f = function
-    | None -> Some pos
-    | Some _ -> raise (Duplicate_label label)
-    in
-    String_map.update label f m
-
-  exception Undefined_label of string
-  let resolve_target m ({label} as target) =
-    match String_map.find_opt label m with
-    | None -> raise (Undefined_label label)
-    | Some pos -> target.pos <- pos
-
-  let resolve_func func =
-    let rec collect m = function
-    | [] -> m
-    | ssa :: l as pos ->
-      let m = match ssa with
-      | J (_, {label}) -> add_label m label pos
-      | _ -> m
-      in
-      collect m l
-    in
-    let map = collect String_map.empty func.proc in
-    let rec resolve = function
-    | [] -> ()
-    | ssa :: l ->
-      let () = match ssa with
-      | J (_, target) -> resolve_target map target
-      | _ -> ()
-      in
-      resolve l
-    in
-    resolve func.proc
-
 %}
 
 %token EOF EOL
 %token <string> ID
 %token <string> LABEL
 %token ENTRY GLOBAL EXTERNAL
-%token CAPTURED NUMVARS FUNC
+%token CAPTURED NUMVARS FUNC BODY
 
-%token DLR "$" LPAR "(" RPAR ")" COMMA ","
+%token LPAR "(" RPAR ")" COMMA ","
+%token WILDCARD "_"
 
 %token <bool> BOOL
 %token <int> INT
@@ -100,8 +57,8 @@ nameid:
     n=INT "," name=ID { (n, name) }
 
 var:
-    "$" "(" t=INT "," v=nameid ")"
-    { make_var v t }
+    t=ID "(" v=nameid ")" { make_var v t }
+  | "_" { Wildcard }
 
 functions:
     { [||] }
@@ -112,30 +69,27 @@ func_list:
   | f=func l=func_list { f :: l }
 
 func:
+    FUNC id=nameid eol
+    captured=captured_vars
     n=num_vars eol
-    FUNC ID eol
-    proc=procedure
+    BODY eol proc=procedure
     {
-      let func = {captured=None; nvars=n; proc=proc} in
-      resolve_func func; func
-    }
-  | captured=captured_vars
-    n=num_vars eol
-    FUNC ID eol
-    proc=procedure
-    {
-      let func = {captured=Some captured; nvars=n; proc=proc} in
-      resolve_func func; func
+      let func = {id; captured; nvars=n; proc} in
+      link_labels func; func
     }
 
 captured_vars:
-    CAPTURED eol l=nameid_list { Array.of_list l }
+    { [||] }
+  | CAPTURED eol l=nameid_list { Array.of_list l }
 
 num_vars:
     NUMVARS n=INT { n }
 
 entry_point:
-    ENTRY eol proc=procedure {{ captured=None; nvars=0; proc=proc }}
+    ENTRY eol
+    n=num_vars eol
+    BODY eol proc=procedure
+    {{id=(-1, ""); captured=[||]; nvars=n; proc=proc}}
 
 procedure:
     l=ssa_list { l }
@@ -169,7 +123,7 @@ ssa_jmp:
     op=ID lb=LABEL { J (cmd_jmp op, {label=lb; pos=[]}) }
 
 ssa_decl:
-    op=ID n=INT name=ID var=var { D (cmd_decl op, n, name, var) }
+    op=ID nameid=nameid var=var { D (cmd_decl op, nameid, var) }
 
 ssa_v:
     op=ID var=var { V (cmd_v op, var) }
