@@ -30,7 +30,7 @@ rule lex = parse
   | "\""          { lex_string [] lexbuf }
   | "true" | "false" as lxm     { BOOL (bool_of_string lxm) }
   | ("+" | "-")? digit+ as lxm  { INT (int_of_string lxm) }
-  | ("#" | "_" | alpha) alnum* as lxm { ID lxm }
+  | ("%" | "_" | alpha) alnum* as lxm { ID lxm }
   | "." alpha alnum* as lxm     { LABEL lxm }
 
 and lex_char acc = parse

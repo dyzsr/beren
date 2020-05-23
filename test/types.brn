@@ -1,0 +1,42 @@
+type t = int
+type t = char
+type t = bool
+
+let (v : string) = "abc"
+
+type t = int * int
+type t = int * string
+
+type t =
+  | Void
+	| Bool of bool
+	| Int of int
+	| String of string
+
+type fn = int -> int
+
+let f x = x
+
+type 'a option =
+  | None
+  | Some of 'a
+
+let v0 = None
+let v1 = Some 123
+let v2 = Some "abc"
+
+type ('a, 'b) pair = 'a * 'b
+let (x : (int, string) pair) = (123, "abc")
+
+type 'a fn = 'a -> 'a
+let (f : 'a fn) = fun x => x
+
+type error =
+  sig
+	  to_string : unit -> string
+	end
+
+method (s : string) to_string () =
+  "error: " ^ s
+
+let (e : error) = "message"

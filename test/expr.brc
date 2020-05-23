@@ -1,0 +1,353 @@
+.external
+  0, print_bool
+  1, print_int
+  2, print_char
+  3, print_string
+  4, print_endline
+
+.global
+  0, enclose
+  1, print_expr
+
+.func 0, %fun_0
+.numvars 3
+.body
+  getarg local(1, %var_1)
+  move local(0, text) local(1, %var_1)
+  makefunc 1, %fun_1 local(2, %var_2)
+  capture local(2, %var_2) local(0, text) 0
+  setret local(2, %var_2)
+  ret
+
+.func 1, %fun_1
+.captured
+  0, text
+.numvars 11
+.body
+  getarg local(1, %var_1)
+  move local(0, %arg) local(1, %var_1)
+  move local(3, %var_3) local(0, %arg)
+  vrnum local(4, %var_4) local(3, %var_3)
+  loadint local(6, %var_6) 0
+  eq _ local(4, %var_4) local(6, %var_6)
+  jmpfalse .L2
+  vrval local(5, %var_5) local(3, %var_3)
+  move local(2, %var_2) outer(0, text)
+  jmp .L1
+.L2
+  loadstr local(9, %var_9) "("
+  move local(10, %var_10) outer(0, text)
+  strcat local(7, %var_7) local(9, %var_9) local(10, %var_10)
+  loadstr local(8, %var_8) ")"
+  strcat local(2, %var_2) local(7, %var_7) local(8, %var_8)
+  jmp .L1
+.L3
+  crash
+.L1
+  setret local(2, %var_2)
+  ret
+
+.func 2, %init_2
+.numvars 2
+.body
+  makefunc 0, %fun_0 local(0, %var_0)
+  move local(1, enclose) local(0, %var_0)
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(0, enclose) local(1, enclose)
+  ret
+
+.func 3, %fun_3
+.captured
+  0, print_expr
+.numvars 56
+.body
+  getarg local(1, %var_1)
+  move local(0, %arg) local(1, %var_1)
+  move local(3, %var_3) local(0, %arg)
+  vrnum local(5, %var_5) local(3, %var_3)
+  loadint local(7, %var_7) 0
+  eq _ local(5, %var_5) local(7, %var_7)
+  jmpfalse .L2
+  vrval local(6, %var_6) local(3, %var_3)
+  move local(4, x) local(6, %var_6)
+  move local(2, %var_2) local(4, x)
+  jmp .L1
+.L2
+  vrnum local(10, %var_10) local(3, %var_3)
+  loadint local(14, %var_14) 1
+  eq _ local(10, %var_10) local(14, %var_14)
+  jmpfalse .L3
+  vrval local(11, %var_11) local(3, %var_3)
+  tuplepart local(12, %var_12) local(11, %var_11) 0
+  move local(8, op) local(12, %var_12)
+  tuplepart local(13, %var_13) local(11, %var_11) 1
+  move local(9, x) local(13, %var_13)
+  move local(15, %var_15) local(8, op)
+  move local(19, %var_19) global(0, enclose)
+  move local(21, %var_21) outer(0, print_expr)
+  move local(22, %var_22) local(9, x)
+  setarg local(22, %var_22)
+  call local(21, %var_21)
+  getret local(20, %var_20)
+  setarg local(20, %var_20)
+  call local(19, %var_19)
+  getret local(17, %var_17)
+  move local(18, %var_18) local(9, x)
+  setarg local(18, %var_18)
+  call local(17, %var_17)
+  getret local(16, %var_16)
+  strcat local(2, %var_2) local(15, %var_15) local(16, %var_16)
+  jmp .L1
+.L3
+  vrnum local(26, %var_26) local(3, %var_3)
+  loadint local(31, %var_31) 2
+  eq _ local(26, %var_26) local(31, %var_31)
+  jmpfalse .L4
+  vrval local(27, %var_27) local(3, %var_3)
+  tuplepart local(28, %var_28) local(27, %var_27) 0
+  move local(23, op) local(28, %var_28)
+  tuplepart local(29, %var_29) local(27, %var_27) 1
+  move local(24, a) local(29, %var_29)
+  tuplepart local(30, %var_30) local(27, %var_27) 2
+  move local(25, b) local(30, %var_30)
+  move local(35, %var_35) global(0, enclose)
+  move local(37, %var_37) outer(0, print_expr)
+  move local(38, %var_38) local(24, a)
+  setarg local(38, %var_38)
+  call local(37, %var_37)
+  getret local(36, %var_36)
+  setarg local(36, %var_36)
+  call local(35, %var_35)
+  getret local(33, %var_33)
+  move local(34, %var_34) local(24, a)
+  setarg local(34, %var_34)
+  call local(33, %var_33)
+  getret local(32, %var_32)
+  move local(39, a) local(32, %var_32)
+  jmp .L6
+.L5
+  crash
+.L6
+  move local(43, %var_43) global(0, enclose)
+  move local(45, %var_45) outer(0, print_expr)
+  move local(46, %var_46) local(25, b)
+  setarg local(46, %var_46)
+  call local(45, %var_45)
+  getret local(44, %var_44)
+  setarg local(44, %var_44)
+  call local(43, %var_43)
+  getret local(41, %var_41)
+  move local(42, %var_42) local(25, b)
+  setarg local(42, %var_42)
+  call local(41, %var_41)
+  getret local(40, %var_40)
+  move local(47, b) local(40, %var_40)
+  jmp .L8
+.L7
+  crash
+.L8
+  move local(54, %var_54) local(39, a)
+  loadstr local(55, %var_55) " "
+  strcat local(52, %var_52) local(54, %var_54) local(55, %var_55)
+  move local(53, %var_53) local(23, op)
+  strcat local(50, %var_50) local(52, %var_52) local(53, %var_53)
+  loadstr local(51, %var_51) " "
+  strcat local(48, %var_48) local(50, %var_50) local(51, %var_51)
+  move local(49, %var_49) local(47, b)
+  strcat local(2, %var_2) local(48, %var_48) local(49, %var_49)
+  jmp .L1
+.L4
+  crash
+.L1
+  setret local(2, %var_2)
+  ret
+
+.func 4, %init_4
+.numvars 2
+.body
+  makefunc 3, %fun_3 local(1, %var_1)
+  move local(0, print_expr) local(1, %var_1)
+  capture local(1, %var_1) local(0, print_expr) 0
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(1, print_expr) local(0, print_expr)
+  ret
+
+.func 5, %init_5
+.numvars 60
+.body
+  loadstr local(3, %var_3) "*"
+  loadstr local(5, %var_5) "100"
+  setnum 0
+  setval local(5, %var_5)
+  makevariant local(4, %var_4)
+  loadstr local(8, %var_8) "-"
+  loadstr local(10, %var_10) "100"
+  setnum 0
+  setval local(10, %var_10)
+  makevariant local(9, %var_9)
+  pushpart local(9, %var_9)
+  pushpart local(8, %var_8)
+  maketuple local(7, %var_7)
+  setnum 1
+  setval local(7, %var_7)
+  makevariant local(6, %var_6)
+  pushpart local(6, %var_6)
+  pushpart local(4, %var_4)
+  pushpart local(3, %var_3)
+  maketuple local(2, %var_2)
+  setnum 2
+  setval local(2, %var_2)
+  makevariant local(1, %var_1)
+  move local(11, a) local(1, %var_1)
+  jmp .L3
+.L2
+  crash
+.L3
+  loadstr local(14, %var_14) "+"
+  loadstr local(17, %var_17) "/"
+  loadstr local(19, %var_19) "20"
+  setnum 0
+  setval local(19, %var_19)
+  makevariant local(18, %var_18)
+  loadstr local(21, %var_21) "10"
+  setnum 0
+  setval local(21, %var_21)
+  makevariant local(20, %var_20)
+  pushpart local(20, %var_20)
+  pushpart local(18, %var_18)
+  pushpart local(17, %var_17)
+  maketuple local(16, %var_16)
+  setnum 2
+  setval local(16, %var_16)
+  makevariant local(15, %var_15)
+  loadstr local(24, %var_24) "*"
+  loadstr local(27, %var_27) "-"
+  loadstr local(29, %var_29) "50"
+  setnum 0
+  setval local(29, %var_29)
+  makevariant local(28, %var_28)
+  loadstr local(31, %var_31) "49"
+  setnum 0
+  setval local(31, %var_31)
+  makevariant local(30, %var_30)
+  pushpart local(30, %var_30)
+  pushpart local(28, %var_28)
+  pushpart local(27, %var_27)
+  maketuple local(26, %var_26)
+  setnum 2
+  setval local(26, %var_26)
+  makevariant local(25, %var_25)
+  loadstr local(34, %var_34) "/"
+  loadstr local(36, %var_36) "10"
+  setnum 0
+  setval local(36, %var_36)
+  makevariant local(35, %var_35)
+  loadstr local(39, %var_39) "-"
+  loadstr local(41, %var_41) "2"
+  setnum 0
+  setval local(41, %var_41)
+  makevariant local(40, %var_40)
+  pushpart local(40, %var_40)
+  pushpart local(39, %var_39)
+  maketuple local(38, %var_38)
+  setnum 1
+  setval local(38, %var_38)
+  makevariant local(37, %var_37)
+  pushpart local(37, %var_37)
+  pushpart local(35, %var_35)
+  pushpart local(34, %var_34)
+  maketuple local(33, %var_33)
+  setnum 2
+  setval local(33, %var_33)
+  makevariant local(32, %var_32)
+  pushpart local(32, %var_32)
+  pushpart local(25, %var_25)
+  pushpart local(24, %var_24)
+  maketuple local(23, %var_23)
+  setnum 2
+  setval local(23, %var_23)
+  makevariant local(22, %var_22)
+  pushpart local(22, %var_22)
+  pushpart local(15, %var_15)
+  pushpart local(14, %var_14)
+  maketuple local(13, %var_13)
+  setnum 2
+  setval local(13, %var_13)
+  makevariant local(12, %var_12)
+  move local(42, b) local(12, %var_12)
+  jmp .L5
+.L4
+  crash
+.L5
+  move local(44, %var_44) global(1, print_expr)
+  move local(45, %var_45) local(11, a)
+  setarg local(45, %var_45)
+  call local(44, %var_44)
+  getret local(43, %var_43)
+  move local(46, text_of_a) local(43, %var_43)
+  jmp .L7
+.L6
+  crash
+.L7
+  move local(48, %var_48) global(1, print_expr)
+  move local(49, %var_49) local(42, b)
+  setarg local(49, %var_49)
+  call local(48, %var_48)
+  getret local(47, %var_47)
+  move local(50, text_of_b) local(47, %var_47)
+  jmp .L9
+.L8
+  crash
+.L9
+  move local(52, %var_52) external(4, print_endline)
+  move local(53, %var_53) local(46, text_of_a)
+  setarg local(53, %var_53)
+  call local(52, %var_52)
+  getret local(51, %var_51)
+  loadunit local(54, %var_54)
+  eq _ local(54, %var_54) local(51, %var_51)
+  jmpfalse .L10
+  jmp .L11
+.L10
+  crash
+.L11
+  move local(56, %var_56) external(4, print_endline)
+  move local(57, %var_57) local(50, text_of_b)
+  setarg local(57, %var_57)
+  call local(56, %var_56)
+  getret local(55, %var_55)
+  loadunit local(58, %var_58)
+  eq _ local(58, %var_58) local(55, %var_55)
+  jmpfalse .L12
+  jmp .L13
+.L12
+  crash
+.L13
+  loadunit local(0, %var_0)
+  loadunit local(59, %var_59)
+  eq _ local(59, %var_59) local(0, %var_0)
+  jmpfalse .L0
+  jmp .L1
+.L0
+  crash
+.L1
+  ret
+
+.entry
+.numvars 3
+.body
+  makefunc 2, %init_2 local(0, var_0)
+  call local(0, var_0)
+  makefunc 4, %init_4 local(1, var_1)
+  call local(1, var_1)
+  makefunc 5, %init_5 local(2, var_2)
+  call local(2, var_2)
+  ret
+
+

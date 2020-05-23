@@ -1,0 +1,32 @@
+type expr = 
+  | Item of string
+  | Unary of string * expr
+  | Binary of string * expr * expr
+
+let enclose text = function
+  | Item _ => text
+  | _ => "(" ^ text ^ ")" 
+
+let rec print_expr = function
+  | Item x => x
+  | Unary (op, x) =>
+    op ^ enclose (print_expr x) x
+  | Binary (op, a, b) =>
+    let a = enclose (print_expr a) a in
+    let b = enclose (print_expr b) b in
+    a ^ " " ^ op ^ " " ^ b
+
+let () =
+  let a = Binary ("*", Item "100", Unary ("-", Item "100")) in
+  let b =
+    Binary ("+",
+      Binary ("/", Item "20", Item "10"),
+      Binary ("*",
+        Binary ("-", Item "50", Item "49"),
+        Binary ("/", Item "10", Unary ("-", Item "2"))))
+  in
+  let text_of_a = print_expr a in
+  let text_of_b = print_expr b in
+  let () = print_endline text_of_a in
+  let () = print_endline text_of_b in
+  ()

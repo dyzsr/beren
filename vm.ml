@@ -657,9 +657,9 @@ let rec run (m : machine) =
     | VS (op, var, s) ->
       (* print_endline (text_ssa ssa); *)
       run_vs m (op, var, s)
-    | VV (op, va, vb) ->
+    | VV (op, dest, src) ->
       (* print_endline (text_ssa ssa); *)
-      run_vv m (op, va, vb)
+      run_vv m (op, dest, src)
     | VVV (op, dest, va, vb) ->
       (* print_endline (text_ssa ssa); *)
       run_vvv m (op, dest, va, vb)
@@ -722,18 +722,20 @@ and run_v m (op, var) =
   | PushField ->
     m.record <- get_var m var :: m.record; next_ssa m
   | MakeTuple ->
-    set_var m (Tuple (Array.of_list m.tuple)) var; next_ssa m
+    set_var m (Tuple (Array.of_list m.tuple)) var;
+    m.tuple <- []; next_ssa m
   | MakeVariant ->
     let (num, value) = m.variant in
-    set_var m (Variant (num, value)) var; next_ssa m
+    set_var m (Variant (num, value)) var;
+    m.variant <- (0, Nil); next_ssa m
   | MakeRecord ->
-    set_var m (Record (Array.of_list m.record)) var; next_ssa m
+    set_var m (Record (Array.of_list m.record)) var;
+    m.record <- []; next_ssa m
 
 and run_i m (op, i) =
   (match op with
   | SetNum ->
-    let (_, _) = m.variant in
-    m.variant <- (i, Nil)
+    let _, val_ = m.variant in m.variant <- (i, val_)
   );
   next_ssa m
 
@@ -761,30 +763,30 @@ and run_vs m (op, var, s) =
   );
   next_ssa m
 
-and run_vv m (op, va, vb) =
+and run_vv m (op, dest, src) =
   (match op with
-  | Move -> set_var m (get_var m vb) va
+  | Move -> set_var m (get_var m src) dest
   | SetRef ->
-    let value = get_ref (get_var m va) in
-    value := get_var m vb
+    let value = get_ref (get_var m dest) in
+    value := get_var m src
   | Deref ->
-    let value = get_ref (get_var m vb) in
-    set_var m !value va
+    let value = get_ref (get_var m src) in
+    set_var m !value dest
   | VariantNum ->
-    let (num, _) = get_variant (get_var m vb) in
-    set_var m (Int num) va
+    let (num, _) = get_variant (get_var m src) in
+    set_var m (Int num) dest
   | VariantVal ->
-    let (_, value) = get_variant (get_var m vb) in
-    set_var m value vb
+    let (_, value) = get_variant (get_var m src) in
+    set_var m value dest
   | IntNeg ->
-    let i = get_int (get_var m vb) in
-    set_var m (Int (-i)) va
+    let i = get_int (get_var m src) in
+    set_var m (Int (-i)) dest
   | StrLen ->
-    let s = get_string (get_var m vb) in
-    set_var m (Int (String.length s)) va
+    let s = get_string (get_var m src) in
+    set_var m (Int (String.length s)) dest
   | BoolNot ->
-    let b = get_bool (get_var m vb) in
-    set_var m (Bool (not b)) va
+    let b = get_bool (get_var m src) in
+    set_var m (Bool (not b)) dest
   );
   next_ssa m
 

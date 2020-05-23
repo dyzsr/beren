@@ -1,0 +1,58 @@
+.external
+  0, print_bool
+  1, print_int
+  2, print_char
+  3, print_string
+  4, print_endline
+
+.global
+  0, f
+  1, a
+
+.func 0, %fun_0
+.numvars 3
+.body
+  getarg local(1, %var_1)
+  move local(0, x) local(1, %var_1)
+  move local(2, %var_2) local(0, x)
+  setret local(2, %var_2)
+  ret
+
+.func 1, %init_1
+.numvars 2
+.body
+  makefunc 0, %fun_0 local(0, %var_0)
+  move local(1, f) local(0, %var_0)
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(0, f) local(1, f)
+  ret
+
+.func 2, %init_2
+.numvars 6
+.body
+  loadint local(1, %var_1) 1
+  loadint local(3, %var_3) 2
+  loadint local(4, %var_4) 3
+  intmul local(2, %var_2) local(3, %var_3) local(4, %var_4)
+  intadd local(0, %var_0) local(1, %var_1) local(2, %var_2)
+  move local(5, a) local(0, %var_0)
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(1, a) local(5, a)
+  ret
+
+.entry
+.numvars 2
+.body
+  makefunc 1, %init_1 local(0, var_0)
+  call local(0, var_0)
+  makefunc 2, %init_2 local(1, var_1)
+  call local(1, var_1)
+  ret
+
+

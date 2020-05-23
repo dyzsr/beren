@@ -14,6 +14,10 @@ let val_of_fun expr (Prototype (patterns, type_tag)) =
     | arg :: rest -> LambdaExpr (arg, aux rest)
   in aux patterns
 
+let make_variable_pattern name =
+  if name = "_" then Wildcard
+  else VariablePattern name
+
 %}
 
 %token EOF
@@ -251,7 +255,7 @@ match_branch:
 lambda_expr:
     e=fun_expr { e }
   | e=function_expr
-    { let name = "#arg" in
+    { let name = "%arg" in
       let arg = VariablePattern name in
       let body = MatchExpr (Variable (None, name), e) in
       LambdaExpr (arg, body)
@@ -349,7 +353,7 @@ field_pattern:
     id=IDENT "=" p=pattern { (id, p) }
 
 variable_pattern:
-    id=IDENT { VariablePattern id }
+    id=IDENT { make_variable_pattern id }
   | WILDCARD { Wildcard }
 
 variant_pattern:

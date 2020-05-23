@@ -80,7 +80,7 @@ let new_globenv () =
 
 let new_func globenv ~prefix =
   let funcid = globenv.funcgen.new_id () in
-  let name = "#" ^ prefix ^ "_" ^ string_of_int funcid in
+  let name = "%" ^ prefix ^ "_" ^ string_of_int funcid in
   funcid, name
 
 
@@ -187,7 +187,7 @@ let rec walk_value_bindings orig_scope env globenv (r, l) =
   if r then
     let iter_pattern (scope, acc_outputs, acc_src_vars) (names, p, _) =
       let scope, nameids = add_names scope env names in
-      let src_var = Vm.Local (new_var env ~prefix:"#var") in
+      let src_var = Vm.Local (new_var env ~prefix:"%var") in
       let output = walk_pattern env nameids src_var failure_target p in
       scope, (output::acc_outputs), (src_var::acc_src_vars)
     in
@@ -210,7 +210,7 @@ let rec walk_value_bindings orig_scope env globenv (r, l) =
     scope, output
   else
     let iter (scope, acc_outputs) (names, p, e) =
-      let chan_var = Vm.Local (new_var env ~prefix:"#var") in
+      let chan_var = Vm.Local (new_var env ~prefix:"%var") in
       let expr_output = walk_expr scope env globenv chan_var e in
       let scope, nameids = add_names scope env names in
       let pattern_output = walk_pattern env nameids chan_var failure_target p in
@@ -226,7 +226,7 @@ let rec walk_value_bindings orig_scope env globenv (r, l) =
 and walk_pattern env nameids src_var failure_target = function
   | Typed_ast.UnitPattern _ ->
     let proc =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.V (Vm.LoadUnit, var) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, var, src_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -236,7 +236,7 @@ and walk_pattern env nameids src_var failure_target = function
     
   | Typed_ast.BoolPattern (b, _) -> 
     let proc =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VB (Vm.LoadBool, var, b) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, var, src_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -246,7 +246,7 @@ and walk_pattern env nameids src_var failure_target = function
 
   | Typed_ast.IntPattern (i, _) ->
     let proc =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VI (Vm.LoadInt, var, i) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, var, src_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -256,7 +256,7 @@ and walk_pattern env nameids src_var failure_target = function
 
   | Typed_ast.CharPattern (c, _) ->
     let proc =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VC (Vm.LoadChar, var, c) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, var, src_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -266,7 +266,7 @@ and walk_pattern env nameids src_var failure_target = function
     
   | Typed_ast.StringPattern (s, _) ->
     let proc =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VS (Vm.LoadStr, var, s) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, var, src_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -276,7 +276,7 @@ and walk_pattern env nameids src_var failure_target = function
 
   | Typed_ast.TuplePattern (l, _) ->
     let iter (acc_outputs, idx) e =
-      let part_var = Vm.Local (new_var env ~prefix:"#var") in
+      let part_var = Vm.Local (new_var env ~prefix:"%var") in
       let part_output = walk_pattern env nameids part_var failure_target e in
       let proc =
         let part = Vm.VVI (Vm.TuplePart, part_var, src_var, idx) in
@@ -323,16 +323,16 @@ and walk_pattern env nameids src_var failure_target = function
     empty_output
 
   | Typed_ast.RefPattern (p, _) ->
-    let var = Vm.Local (new_var env ~prefix:"#var") in
+    let var = Vm.Local (new_var env ~prefix:"%var") in
     let output = walk_pattern env nameids var failure_target p in
     let proc = output.proc @ [Vm.VV (Vm.Deref, var, src_var)] in
     {funcs=[]; proc}
 
   | Typed_ast.VariantPattern ((i, _, _), None, _) ->
-    let num_var = Vm.Local (new_var env ~prefix:"#var") in
+    let num_var = Vm.Local (new_var env ~prefix:"%var") in
     let proc =
       let vrnum = Vm.VV (Vm.VariantNum, num_var, src_var) in
-      let tmp_var = Vm.Local (new_var env ~prefix:"#var") in
+      let tmp_var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VI (Vm.LoadInt, tmp_var, i) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, num_var, tmp_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -341,12 +341,12 @@ and walk_pattern env nameids src_var failure_target = function
     {funcs=[]; proc}
 
   | Typed_ast.VariantPattern ((i, _, _), Some p, _) ->
-    let num_var = Vm.Local (new_var env ~prefix:"#var") in
-    let val_var = Vm.Local (new_var env ~prefix:"#var") in
+    let num_var = Vm.Local (new_var env ~prefix:"%var") in
+    let val_var = Vm.Local (new_var env ~prefix:"%var") in
     let output = walk_pattern env nameids val_var failure_target p in
     let proc =
       let vrnum = Vm.VV (Vm.VariantNum, num_var, src_var) in
-      let tmp_var = Vm.Local (new_var env ~prefix:"#var") in
+      let tmp_var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VI (Vm.LoadInt, tmp_var, i) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, num_var, tmp_var) in
       let jmp = Vm.J (Vm.JmpFalse, failure_target) in
@@ -409,7 +409,7 @@ and walk_expr scope env globenv dest_var = function
     {funcs=[]; proc}
 
   | Typed_ast.Construct ((i, _, _), e, _) ->
-    let var = Vm.Local (new_var env ~prefix:"#var") in
+    let var = Vm.Local (new_var env ~prefix:"%var") in
     let output = walk_expr scope env globenv var e in
     let proc =
       let setnum = Vm.I (Vm.SetNum, i) in
@@ -428,8 +428,8 @@ and walk_expr scope env globenv dest_var = function
     {funcs=[]; proc}
 
   | Typed_ast.Assign (assignee, assigner, _) ->
-    let dest = Vm.Local (new_var env ~prefix:"#var") in
-    let src = Vm.Local (new_var env ~prefix:"#var") in
+    let dest = Vm.Local (new_var env ~prefix:"%var") in
+    let src = Vm.Local (new_var env ~prefix:"%var") in
     let assignee_output = walk_expr scope env globenv dest assignee in
     let assigner_output = walk_expr scope env globenv src assigner in
     let proc =
@@ -443,7 +443,7 @@ and walk_expr scope env globenv dest_var = function
 
   | Typed_ast.Tuple (l, _) ->
     let iter (env, acc_outputs, acc_vars) e =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let output = walk_expr scope env globenv var e in 
       env, (output :: acc_outputs), (var :: acc_vars)
     in
@@ -454,10 +454,9 @@ and walk_expr scope env globenv dest_var = function
       let maketuple = Vm.V (Vm.MakeTuple, dest_var) in
       setparts @ [maketuple]
     in
-    let outputs = List.rev outputs in
-    let outputs = List.fold_left concat_outputs empty_output outputs in
-    let outputs = {outputs with proc=proc} in
-    outputs
+    let output = List.fold_left concat_outputs empty_output (List.rev outputs) in
+    let output = concat_outputs output {funcs=[]; proc} in
+    output
 
   | Typed_ast.List (l, t) ->
     (match l with
@@ -482,8 +481,8 @@ and walk_expr scope env globenv dest_var = function
     failwith "walk_expr: record"
   
   | Typed_ast.Call (clr, cle, _) ->
-    let caller = Vm.Local (new_var env ~prefix:"#var") in
-    let callee = Vm.Local (new_var env ~prefix:"#var") in
+    let caller = Vm.Local (new_var env ~prefix:"%var") in
+    let callee = Vm.Local (new_var env ~prefix:"%var") in
     let caller_output = walk_expr scope env globenv caller clr in
     let callee_output = walk_expr scope env globenv callee cle in
     let proc =
@@ -497,7 +496,7 @@ and walk_expr scope env globenv dest_var = function
     output
   
   | Typed_ast.Unary (op, operand, _) ->
-    let var = Vm.Local (new_var env ~prefix:"#var") in
+    let var = Vm.Local (new_var env ~prefix:"%var") in
     let output = walk_expr scope env globenv var operand in
     let proc = match op with
       | Ast.Positive -> [Vm.VV (Vm.Move, dest_var, var)]
@@ -508,8 +507,8 @@ and walk_expr scope env globenv dest_var = function
     output
 
   | Typed_ast.Binary (op, v1, v2, _) ->
-    let va = Vm.Local (new_var env ~prefix:"#var") in
-    let vb = Vm.Local (new_var env ~prefix:"#var") in
+    let va = Vm.Local (new_var env ~prefix:"%var") in
+    let vb = Vm.Local (new_var env ~prefix:"%var") in
     let a_output = walk_expr scope env globenv va v1 in
     let b_output = walk_expr scope env globenv vb v2 in
     let proc = match op with
@@ -571,7 +570,7 @@ and walk_if_expr scope env globenv dest_var (cond_e, then_e, else_opt, _) =
     let label = new_label env ~prefix:"L" in
     label, [Vm.L label], Vm.{label; pos=[]}
   in
-  let cond = Vm.Local (new_var env ~prefix:"#var") in
+  let cond = Vm.Local (new_var env ~prefix:"%var") in
   let cond_output = walk_expr scope env globenv cond cond_e in
   let then_output = walk_expr scope env globenv dest_var then_e in
   let else_output = match else_opt with
@@ -585,7 +584,7 @@ and walk_if_expr scope env globenv dest_var (cond_e, then_e, else_opt, _) =
   let else_target = Vm.{label=else_label; pos=[]} in
   let proc =
     let select_by_cond =
-      let var = Vm.Local (new_var env ~prefix:"#var") in
+      let var = Vm.Local (new_var env ~prefix:"%var") in
       let load = Vm.VB (Vm.LoadBool, var, true) in
       let cmp = Vm.VVV (Vm.Eq, Vm.Wildcard, cond, var) in
       let jmp_to_else = Vm.J (Vm.JmpFalse, else_target) in
@@ -607,7 +606,7 @@ and walk_if_expr scope env globenv dest_var (cond_e, then_e, else_opt, _) =
 
 and walk_match_expr scope env globenv dest_var (e, l, _) =
   (* source expression *)
-  let src_var = Vm.Local (new_var env ~prefix:"#var") in
+  let src_var = Vm.Local (new_var env ~prefix:"%var") in
   let src_output = walk_expr scope env globenv src_var e in
   (* pos after match expr *)
   let after_label = new_label env ~prefix:"L" in
@@ -650,9 +649,9 @@ and walk_lambda_expr scope env globenv dest_var (names, pattern, expr, _) =
     let scope, nameids = add_names scope env names in
     let failure_label = new_label env ~prefix:"L" in
     let failure_target = Vm.make_target failure_label in
-    let arg_var = Vm.Local (new_var env ~prefix:"#var") in
+    let arg_var = Vm.Local (new_var env ~prefix:"%var") in
     let pattern_output = walk_pattern env nameids arg_var failure_target pattern in
-    let ret_var = Vm.Local (new_var env ~prefix:"#var") in
+    let ret_var = Vm.Local (new_var env ~prefix:"%var") in
     let expr_output = walk_expr scope env globenv ret_var expr in
     let proc =
       let getarg = Vm.V (Vm.GetArg, arg_var) in

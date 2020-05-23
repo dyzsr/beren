@@ -193,10 +193,10 @@ let raise_incompatible_types d s =
   raise (Incompatible_types (d, s))
 
 let rec agree_on_type tvtab dest src =
-  let () =
-    print_value2 "~dest" dest (apply_real_type tvtab dest);
-    print_value2 "~src" src (apply_real_type tvtab src)
-  in
+  (* let () =
+    debug_value2 "~dest" dest (apply_real_type tvtab dest);
+    debug_value2 "~src" src (apply_real_type tvtab src)
+  in *)
   match dest, src with
   | Generics _, _ -> failwith "agree_on_type: generics"
   | _, Generics _ -> failwith "agree_on_type: generics"
@@ -221,8 +221,8 @@ let rec agree_on_type tvtab dest src =
     | t1, t2 ->
       agree_on_type tvtab t1 t2
     ) in
-    let () = print_value2 "++merged++" t1 t2 in
-    let () = print_value2 "**merged**" (apply_real_type tvtab t1) (apply_real_type tvtab t2) in
+    (* let () = debug_value2 "++merged++" t1 t2 in
+    let () = debug_value2 "**merged**" (apply_real_type tvtab t1) (apply_real_type tvtab t2) in *)
     tvtab
   | d, Tyvar (_, id) ->
     (* let () = print_endline "agree_on_type: dest type_var" in *)
@@ -299,7 +299,7 @@ and agree_on_generics tvtab t1 t2 =
 exception Arity_mismatch of string
 
 let fold_symtab symtab (k, v) =
-  let () = print_value k v in
+  let () = debug_value k v in
   add_value k v symtab
 
 let make_tyvars (tyvars : tyvar list) =
@@ -356,8 +356,8 @@ let rec walk_value_bindings symtab tvtab (r, l) =
       let tvtab, expr_typ, expr_ast = walk_expr symtab tvtab expr in
       let tvtab = agree_on_type tvtab pattern_typ expr_typ in
       let () =
-        print_value "[pattern]" (apply_real_type tvtab pattern_typ);
-        print_value "[expr]" (apply_real_type tvtab expr_typ)
+        debug_value "[pattern]" (apply_real_type tvtab pattern_typ);
+        debug_value "[expr]" (apply_real_type tvtab expr_typ)
       in
       tvtab, (expr_ast :: acc_asts)
     in
@@ -377,8 +377,8 @@ let rec walk_value_bindings symtab tvtab (r, l) =
       let tvtab, expr_typ, expr_ast = walk_expr symtab tvtab expr in
       let tvtab = agree_on_type tvtab pattern_typ expr_typ in
       let () =
-        print_value "[pattern]" (apply_real_type tvtab pattern_typ);
-        print_value "[expr]" (apply_real_type tvtab expr_typ)
+        debug_value "[pattern]" (apply_real_type tvtab pattern_typ);
+        debug_value "[expr]" (apply_real_type tvtab expr_typ)
       in
       let bindings = List.map (fun (k, v) -> k, apply_real_type tvtab v) bindings in
       bindings, (names, pattern_ast, expr_ast)
@@ -445,7 +445,7 @@ and walk_capident symtab tvtab name =
       Specific (tyvars, typ)
     | t -> t
   in
-  let () = print_value name typ in
+  let () = debug_value name typ in
   tvtab, typ, Typed_ast.Variant (variant, typ)
 
 and walk_construct symtab tvtab (name, e) =
@@ -462,13 +462,13 @@ and walk_construct symtab tvtab (name, e) =
     in
     let tvtab, arg_typ, arg = walk_expr symtab tvtab e in
     let tvtab = agree_on_type tvtab param_typ arg_typ in
-    let () = print_value name typ in
+    let () = debug_value name typ in
     tvtab, typ, Typed_ast.Construct (variant, arg, ret_typ)
 
 and walk_variable symtab tvtab = function
   | None, name ->
     let var = lookup_value name symtab in
-    let () = print_value2 ("$" ^ name) var (apply_real_type tvtab var) in
+    let () = debug_value2 ("$" ^ name) var (apply_real_type tvtab var) in
     tvtab, var, Typed_ast.Variable (None, name, var)
   | _ ->
     failwith "walk_variable: not implemented"
@@ -514,8 +514,8 @@ and walk_call symtab tvtab (c, e) =
   let func = Function (arg, body) in
   let tvtab = agree_on_type tvtab func caller in
   let tvtab = agree_on_type tvtab arg callee in
-  let () = print_value2 "[caller]" func (apply_real_type tvtab func) in
-  let () = print_value2 "[callee]" arg (apply_real_type tvtab arg) in
+  let () = debug_value2 "[caller]" func (apply_real_type tvtab func) in
+  let () = debug_value2 "[callee]" arg (apply_real_type tvtab arg) in
   tvtab, body, Typed_ast.Call (caller_ast, callee_ast, body)
 
 and walk_unary symtab tvtab (op, e) =
@@ -548,7 +548,10 @@ and walk_binary symtab tvtab (op, a, b) =
   | Ast.Cons ->
     let list_typ = Specific ([a], lookup_type "list" symtab) in
     let tvtab = agree_on_type tvtab list_typ b in
-    tvtab, list_typ, Typed_ast.Binary (op, a_ast, b_ast, list_typ)
+    let item_t = List.hd (Types.extract_param_type list_typ) in
+    let ast = Typed_ast.Construct (Types.list_cons,
+      Typed_ast.Tuple ([a_ast; b_ast], Types.Tuple [item_t; list_typ]), list_typ) in
+    tvtab, list_typ, ast
   | Ast.Append ->
     let list_typ = Specific ([Tyvar (new_tyvar "a")], lookup_type "list" symtab) in
     let tvtab = agree_on_type tvtab list_typ a in
@@ -580,23 +583,23 @@ and walk_if_expr symtab tvtab (cond, then_e, else_opt) =
 and walk_match_expr symtab tvtab (e, l) =
   let tvtab, acc_pattern, data_ast = walk_expr symtab tvtab e in
   let acc_body = Tyvar (new_tyvar "a") in
-  let () = print_value "[body]" acc_body in
+  let () = debug_value "[body]" acc_body in
   let aux (tvtab, branch_asts) (pattern, body) =
     let bindings, tvtab, pattern, pattern_ast = walk_pattern symtab tvtab pattern in
     let varnames = List.map fst bindings in
     let tvtab = agree_on_type tvtab acc_pattern pattern in
-    let () = print_value2 "[branch-pattern]" pattern (apply_real_type tvtab pattern) in
+    let () = debug_value2 "[branch-pattern]" pattern (apply_real_type tvtab pattern) in
     let bindings = List.map (fun (k, v) -> k, apply_real_type tvtab v) bindings in
     let symtab = List.fold_left fold_symtab symtab bindings in
     let tvtab, body, body_ast = walk_expr symtab tvtab body in
     let tvtab = agree_on_type tvtab acc_body body in
-    let () = print_value2 "[branch-body]" body (apply_real_type tvtab body) in
+    let () = debug_value2 "[branch-body]" body (apply_real_type tvtab body) in
     tvtab, ((varnames, pattern_ast, body_ast, body) :: branch_asts)
   in
   let tvtab, branch_asts = List.fold_left aux (tvtab, []) l in
   let branch_asts = List.rev branch_asts in
   let typ = acc_body in
-  let () = print_value2 "[match]" typ (apply_real_type tvtab typ) in
+  let () = debug_value2 "[match]" typ (apply_real_type tvtab typ) in
   tvtab, typ, Typed_ast.MatchExpr (data_ast, branch_asts, typ)
 
 and walk_lambda_expr symtab tvtab (arg, body) =
@@ -606,7 +609,7 @@ and walk_lambda_expr symtab tvtab (arg, body) =
   let symtab = List.fold_left fold_symtab symtab bindings in
   let tvtab, body, body_ast = walk_expr symtab tvtab body in
   let func = Function (arg, body) in
-  let () = print_value2 "[fun]" func (apply_real_type tvtab func) in
+  let () = debug_value2 "[fun]" func (apply_real_type tvtab func) in
   tvtab, func, Typed_ast.LambdaExpr (varnames, arg_ast, body_ast, func)
 
 and walk_pattern symtab tvtab = function
@@ -642,12 +645,12 @@ and walk_pattern symtab tvtab = function
     bindings, tvtab, typ, Typed_ast.RefPattern (ast, typ)
   | Ast.VariablePattern name ->
     let typ = Tyvar (new_tyvar "a") in
-    let () = print_value ("<" ^ name ^ ">") typ in
+    let () = debug_value ("<" ^ name ^ ">") typ in
     let binding = (name, typ) in
     [binding], tvtab, typ, Typed_ast.VariablePattern (name, typ)
   | Ast.Wildcard ->
     let typ = Tyvar (new_tyvar "a") in
-    let () = print_value "_" typ in
+    let () = debug_value "_" typ in
     [], tvtab, typ, Typed_ast.Wildcard typ
   | Ast.VariantPattern (name, p) ->
     walk_variant_pattern symtab tvtab (name, p)

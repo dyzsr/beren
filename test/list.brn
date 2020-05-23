@@ -33,3 +33,29 @@ let map f l =
 let rec map f = function
   | [] => []
   | h :: t => f h :: map f t
+
+let print_int_list l =
+  let () = print_char #'[' in
+	let rec iter = function
+	  | [] => print_char #']'
+		| e :: l =>
+		  let () = print_int e in
+			let () = print_char #',' in
+			iter l
+	in
+	let () = iter l in
+	print_endline ""
+
+let println_int x =
+  let () = print_int x in
+  print_endline ""
+
+let () = 
+  let a = make 5 1 in
+	let () = print_int_list a in
+	let b = 5 :: 4 :: 3 :: 2 :: a in
+	let () = print_int_list b in
+	let c = rev b in
+	let () = print_int_list c in
+	let () = println_int (length c) in
+	()

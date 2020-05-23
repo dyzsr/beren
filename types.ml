@@ -215,8 +215,8 @@ and string_of_datatype tvtab priority = function
         let tvtab = bind_tyvar name key tvtab in
         tvtab, name
     in
-    tvtab, "'(" ^ name ^ ", " ^ string_of_int key ^ ")"
-    (* tvtab, "'" ^ name *)
+    (* tvtab, "'(" ^ name ^ ", " ^ string_of_int key ^ ")" *)
+    tvtab, "'" ^ name
   | Tuple l ->
     let rec iter tvtab acc = function
     | [] -> tvtab, acc
@@ -297,6 +297,19 @@ let print_value2 name typ1 typ2 =
   let _, typ1 = string_of_datatype empty_tvtab 0 typ1 in
   let _, typ2 = string_of_datatype empty_tvtab 0 typ2 in
   print_endline ("val " ^ name ^ " : " ^ typ1 ^ " --- " ^ typ2)
+
+let show_debug = false
+
+let debug_value name typ =
+  if show_debug then
+  let _, typ = string_of_datatype empty_tvtab 0 typ in
+  print_endline ("- " ^ name ^ " : " ^ typ)
+
+let debug_value2 name typ1 typ2 =
+  if show_debug then
+  let _, typ1 = string_of_datatype empty_tvtab 0 typ1 in
+  let _, typ2 = string_of_datatype empty_tvtab 0 typ2 in
+  print_endline ("- " ^ name ^ " : " ^ typ1 ^ " --- " ^ typ2)
 
 let print_symtab symtab =
   Name_map.iter print_type symtab.types;
@@ -462,7 +475,10 @@ let default_symtab =
   let default_value_list =
     let tyvar = Tyvar (new_tyvar "a") in
     [ "ref", Function (tyvar, Specific ([tyvar], ref_type))
+    ; "print_bool", Function (Bool, Unit)
     ; "print_int", Function (Int, Unit)
+    ; "print_char", Function (Char, Unit)
+    ; "print_string", Function (String, Unit)
     ; "print_endline", Function (String, Unit)
     ]
   in
