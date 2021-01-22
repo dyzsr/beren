@@ -1,0 +1,31 @@
+.external
+  0, print_bool
+  1, print_int
+  2, print_char
+  3, print_string
+  4, print_endline
+
+.global
+  0, a
+
+.func 0, %init_0
+.numvars 2
+.body
+  setnum 0
+  makevariant local(0, %var_0)
+  move local(1, a) local(0, %var_0)
+  jmp .L1
+.L0
+  crash
+.L1
+  move global(0, a) local(1, a)
+  ret
+
+.entry
+.numvars 1
+.body
+  makefunc 0, %init_0 local(0, var_0)
+  call local(0, var_0)
+  ret
+
+

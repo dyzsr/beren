@@ -1,0 +1,32 @@
+(ocamllex
+ (modules lexer))
+(ocamllex ssa_lexer)
+
+(menhir
+ (modules parser))
+
+(menhir
+ (modules ssa_parser))
+
+(library
+ (name utils)
+ (modules utils))
+
+(library
+ (name vm)
+ (modules vm)
+ (libraries utils))
+
+(executable
+ (name berenc)
+ (modules berenc parser lexer ast types typed_ast type_inference codegen)
+ (libraries vm utils))
+
+(executable
+ (name beren)
+ (modules beren ssa_parser ssa_lexer)
+ (libraries vm utils))
+
+(env
+ (dev
+   (flags (:standard -w -A))))
