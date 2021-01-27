@@ -1,0 +1,7 @@
+align-constructors-decl=true
+align-variants-decl=true
+break-separators=before
+dock-collection-brackets=false
+let-and=compact
+let-binding-spacing=double-semicolon
+type-decl=compact
