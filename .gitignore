@@ -2,6 +2,7 @@
 .vscode
 .idea
 bin
+.DS_Store
 
 *.annot
 *.cmo
