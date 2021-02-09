@@ -2,7 +2,6 @@
 type decl =
   | TypeBindings   of type_bindings
   | ValueBindings  of value_bindings
-  | MethodBindings of method_bindings
 
 and type_bindings = bool (* recursive *) * type_binding list
 
@@ -13,8 +12,6 @@ and type_variable = string list
 and type_construct =
   | TypeExpr      of type_expr
   | VariantsType  of variants_type
-  | RecordType    of record_type
-  | InterfaceType of interface_type
 
 and type_expr =
   | SingleType   of type_name
@@ -26,17 +23,9 @@ and type_name = TypeSymbol of string | TypeName of string
 
 and variants_type = (string (* constructor *) * type_expr option) list
 
-and record_type = (string (* field name *) * type_expr) list
-
-and interface_type = (string (* signature *) * type_expr) (* type *) list
-
 and value_bindings = bool (* recursive *) * value_binding list
 
 and value_binding = pattern * expr
-
-and method_bindings = bool * method_binding list
-
-and method_binding = pattern (* receiver *) * (pattern * expr)
 
 and pattern =
   | BoolPattern     of bool
@@ -47,16 +36,12 @@ and pattern =
   | TuplePattern    of pattern list (* (?, ?, ...) *)
   | ListPattern     of pattern list (* [?, ?, ...] *)
   | ConsPattern     of pattern * pattern (* ? :: ? *)
-  | ArrayPattern    of pattern list (* [|?, ?, ...|] *)
-  | RecordPattern   of record_pattern (* {?=?, ...} *)
   | VariablePattern of string (* id *)
   | RefPattern      of pattern
   | Wildcard
   | VariantPattern  of string (* constructor *) * pattern option (* value *)
   | PatternList     of pattern list
   | PatternWithType of pattern * type_expr
-
-and record_pattern = (string * pattern) list
 
 and expr =
   | Unit
@@ -69,8 +54,6 @@ and expr =
   | Assign       of variable * expr
   | Tuple        of expr list
   | List         of expr list
-  | Array        of expr list
-  | Record       of record_expr
   | Call         of expr * expr
   | Unary        of unary_op * expr
   | Binary       of binary_op * expr * expr
@@ -82,8 +65,6 @@ and expr =
   | ExprWithType of expr * type_expr
 
 and variable = expr option * string
-
-and record_expr = (string * expr) list
 
 and unary_op = Positive | Negative | Deref
 
@@ -133,7 +114,6 @@ let rep_to_string rep =
 let rec decl_to_rep = function
   | TypeBindings b -> type_bindings_to_rep b
   | ValueBindings b -> value_bindings_to_rep b
-  | MethodBindings b -> method_bindings_to_rep b
 
 and type_bindings_to_rep ((r, l) : type_bindings) =
   let binding_to_rep (typvars_opt, id, construct) =
@@ -162,8 +142,6 @@ and type_vars_to_rep = function
 and type_construct_to_rep = function
   | TypeExpr t -> type_expr_to_rep t
   | VariantsType t -> variant_type_to_rep t
-  | RecordType t -> record_type_to_rep t
-  | InterfaceType t -> interface_type_to_rep t
 
 and type_expr_to_rep = function
   | SingleType t ->
@@ -188,18 +166,6 @@ and variant_type_to_rep l =
   in
   ManyLines ("variants-type", List.map aux l)
 
-and record_type_to_rep l =
-  let aux (name, typ) =
-    ManyLines ("field", [ OneLine ("name", name); type_expr_to_rep typ ])
-  in
-  ManyLines ("record-type", List.map aux l)
-
-and interface_type_to_rep l =
-  let aux (name, typ) =
-    ManyLines ("signature", [ OneLine ("name", name); type_expr_to_rep typ ])
-  in
-  ManyLines ("interface-type", List.map aux l)
-
 and value_bindings_to_rep ((r, l) : value_bindings) =
   let binding_to_rep (pattern, expr) =
     let pattern_rep = pattern_to_rep pattern in
@@ -207,17 +173,6 @@ and value_bindings_to_rep ((r, l) : value_bindings) =
     ManyLines ("binding", [ pattern_rep; expr_rep ])
   in
   let name = "value " ^ if r then "rec" else "nonrec" in
-  let bindings = List.map binding_to_rep l in
-  ManyLines (name, bindings)
-
-and method_bindings_to_rep ((r, l) : method_bindings) =
-  let binding_to_rep (receiver, (pattern, expr)) =
-    let receiver_rep = pattern_to_rep receiver in
-    let pattern_rep = pattern_to_rep pattern in
-    let expr_rep = expr_to_rep expr in
-    ManyLines ("binding", [ receiver_rep; pattern_rep; expr_rep ])
-  in
-  let name = "method " ^ if r then "rec" else "nonrec" in
   let bindings = List.map binding_to_rep l in
   ManyLines (name, bindings)
 
@@ -231,8 +186,6 @@ and pattern_to_rep = function
   | ListPattern l -> ManyLines ("list-pattern", List.map pattern_to_rep l)
   | ConsPattern (hd, tl) ->
       ManyLines ("cons-pattern", [ pattern_to_rep hd; pattern_to_rep tl ])
-  | ArrayPattern l -> ManyLines ("array-pattern", List.map pattern_to_rep l)
-  | RecordPattern p -> record_pattern_to_rep p (* {?=?, ...} *)
   | VariablePattern v -> OneLine ("variable-pattern", v) (* id *)
   | RefPattern p -> ManyLines ("ref-pattern", [ pattern_to_rep p ])
   | Wildcard -> OneLine ("wildcard", "_")
@@ -246,12 +199,6 @@ and pattern_to_rep = function
   | PatternWithType (p, typ) ->
       ManyLines ("pattern-with-type", [ pattern_to_rep p; type_expr_to_rep typ ])
 
-and record_pattern_to_rep l =
-  let field_pattern_to_rep (name, pattern) =
-    ManyLines ("field", [ OneLine ("name", name); pattern_to_rep pattern ])
-  in
-  ManyLines ("record-pattern", List.map field_pattern_to_rep l)
-
 and expr_to_rep = function
   | Unit -> OneLine ("unit", "()")
   | Bool b -> OneLine ("bool", string_of_bool b)
@@ -264,8 +211,6 @@ and expr_to_rep = function
       ManyLines ("assignment", [ variable_to_rep v; expr_to_rep e ])
   | Tuple l -> ManyLines ("tuple", List.map expr_to_rep l)
   | List l -> ManyLines ("list", List.map expr_to_rep l)
-  | Array l -> ManyLines ("array", List.map expr_to_rep l)
-  | Record e -> record_expr_to_rep e
   | Call (caller, e) -> ManyLines ("call", [ expr_to_rep caller; expr_to_rep e ])
   | Unary (op, e) -> unary_op_to_rep (op, e)
   | Binary (op, a, b) -> binary_op_to_rep (op, a, b)
@@ -282,12 +227,6 @@ and variable_to_rep = function
   | None, name -> OneLine ("variable", name)
   | Some e, name ->
       ManyLines ("variable", [ expr_to_rep e; OneLine ("name", name) ])
-
-and record_expr_to_rep l =
-  let field_to_rep (name, e) =
-    ManyLines ("field", [ OneLine ("name", name); expr_to_rep e ])
-  in
-  ManyLines ("record", List.map field_to_rep l)
 
 and unary_op_to_rep (op, e) =
   let op_text =

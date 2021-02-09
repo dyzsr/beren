@@ -80,10 +80,8 @@ type op_v =
   | Call
   | SetVal
   | PushPart
-  | PushField
   | MakeTuple
   | MakeVariant
-  | MakeRecord
 
 let cmd_v =
   let mapping =
@@ -95,10 +93,8 @@ let cmd_v =
     ; ("call", Call)
     ; ("setval", SetVal)
     ; ("pushpart", PushPart)
-    ; ("pushfield", PushField)
     ; ("maketuple", MakeTuple)
     ; ("makevariant", MakeVariant)
-    ; ("makerecord", MakeRecord)
     ]
   in
   get_nameid (to_map mapping)
@@ -113,10 +109,8 @@ let text_v = function
   | Call -> "call"
   | SetVal -> "setval"
   | PushPart -> "pushpart"
-  | PushField -> "pushfield"
   | MakeTuple -> "maketuple"
   | MakeVariant -> "makevariant"
-  | MakeRecord -> "makerecord"
 ;;
 
 type op_i = SetNum
@@ -260,23 +254,14 @@ let text_vvv = function
   | Select -> "select"
 ;;
 
-type op_vvi = TuplePart | RecordField | Capture
+type op_vvi = TuplePart | Capture
 
 let cmd_vvi =
-  let mapping =
-    [ ("tuplepart", TuplePart)
-    ; ("recordfield", RecordField)
-    ; ("capture", Capture)
-    ]
-  in
+  let mapping = [ ("tuplepart", TuplePart); ("capture", Capture) ] in
   get_nameid (to_map mapping)
 ;;
 
-let text_vvi = function
-  | TuplePart -> "tuplepart"
-  | RecordField -> "recordpart"
-  | Capture -> "capture"
-;;
+let text_vvi = function TuplePart -> "tuplepart" | Capture -> "capture"
 
 (* SSA form *)
 
@@ -437,9 +422,7 @@ type value =
   | String   of string
   | Ref      of value ref
   | Tuple    of value array
-  | Array    of value array
   | Variant  of int * value
-  | Record   of value array
   | Function of funcval
   | Builtin  of nameid
 
@@ -457,10 +440,8 @@ let rec string_of_value = function
       let strs = Array.map string_of_value l in
       let str = String.concat ", " (Array.to_list strs) in
       "(" ^ str ^ ")"
-  | Array l -> failwith "string_of_value"
   | Variant (i, v) ->
       "variant (" ^ string_of_int i ^ ", " ^ string_of_value v ^ ")"
-  | Record _ -> failwith "string_of_value"
   | Function _ -> "function"
   | Builtin (id, name) -> "builtin: " ^ name
 ;;
@@ -493,10 +474,6 @@ exception Not_a_variant
 
 let get_variant = function Variant (n, v) -> (n, v) | _ -> raise Not_a_variant
 
-exception Not_a_record
-
-let get_record = function Record v -> v | _ -> raise Not_a_record
-
 exception Not_a_ref
 
 let get_ref = function Ref v -> v | _ -> raise Not_a_ref
@@ -516,7 +493,6 @@ let same_kind = function
   | Ref _, Ref _
   | Tuple _, Tuple _
   | Variant _, Variant _
-  | Record _, Record _
   | Function _, Function _ ->
       ()
   | v1, v2 -> raise (Not_same_kind (string_of_value v1, string_of_value v2))
@@ -558,7 +534,6 @@ type machine =
   ; mutable cond : bool
   ; mutable tuple : value list
   ; mutable variant : int * value
-  ; mutable record : value list
   ; mutable arg : value
   ; mutable ret : value
   ; mutable captured : value list
@@ -613,7 +588,7 @@ let externals =
 ;;
 
 let call_builtin m (id, name) =
-  ( match id with
+  (match id with
   | 0 ->
       let b = get_bool m.arg in
       if b then print_string "true" else print_string "false";
@@ -634,7 +609,7 @@ let call_builtin m (id, name) =
       let s = get_string m.arg in
       print_endline s;
       m.ret <- Unit
-  | _ -> failwith "call_builtin" );
+  | _ -> failwith "call_builtin");
   next_ssa m
 ;;
 
@@ -654,7 +629,6 @@ let create program =
   ; cond = false
   ; tuple = []
   ; variant = (0, Nil)
-  ; record = []
   ; arg = Nil
   ; ret = Nil
   ; captured = []
@@ -705,7 +679,7 @@ let rec run (m : machine) =
           run_vvv m (op, dest, va, vb)
       | VVI (op, dest, var, i) ->
           (* print_endline (text_ssa ssa); *)
-          run_vvi m (op, dest, var, i) )
+          run_vvi m (op, dest, var, i))
 
 and run_s m = function
   | Ret -> (
@@ -715,7 +689,7 @@ and run_s m = function
       | frame :: stack ->
           m.frame <- frame;
           m.stack <- stack;
-          m.pc <- next_pos frame.pos )
+          m.pc <- next_pos frame.pos)
   | Nop -> next_ssa m
   | Crash -> failwith "crash"
 
@@ -726,11 +700,11 @@ and run_j m (op, target) =
   | Jmp -> m.pc <- target.pos
 
 and run_d m (op, (src_id, _), var) =
-  ( match op with
+  (match op with
   | MakeFunc ->
       let func = m.program.funcs.(src_id) in
       let capts = Array.make (Array.length func.captured) Nil in
-      set_var m (Function { capts; func }) var );
+      set_var m (Function { capts; func }) var);
   next_ssa m
 
 and run_v m (op, var) =
@@ -754,16 +728,13 @@ and run_v m (op, var) =
       match get_var m var with
       | Function f -> call_func m f
       | Builtin (id, name) -> call_builtin m (id, name)
-      | _ -> raise Not_a_function )
+      | _ -> raise Not_a_function)
   | SetVal ->
       let num, _ = m.variant in
       m.variant <- (num, get_var m var);
       next_ssa m
   | PushPart ->
       m.tuple <- get_var m var :: m.tuple;
-      next_ssa m
-  | PushField ->
-      m.record <- get_var m var :: m.record;
       next_ssa m
   | MakeTuple ->
       set_var m (Tuple (Array.of_list m.tuple)) var;
@@ -774,16 +745,12 @@ and run_v m (op, var) =
       set_var m (Variant (num, value)) var;
       m.variant <- (0, Nil);
       next_ssa m
-  | MakeRecord ->
-      set_var m (Record (Array.of_list m.record)) var;
-      m.record <- [];
-      next_ssa m
 
 and run_i m (op, i) =
-  ( match op with
+  (match op with
   | SetNum ->
       let _, val_ = m.variant in
-      m.variant <- (i, val_) );
+      m.variant <- (i, val_));
   next_ssa m
 
 and run_vb m (op, var, b) =
@@ -803,7 +770,7 @@ and run_vs m (op, var, s) =
   next_ssa m
 
 and run_vv m (op, dest, src) =
-  ( match op with
+  (match op with
   | Move -> set_var m (get_var m src) dest
   | SetRef ->
       let value = get_ref (get_var m dest) in
@@ -825,7 +792,7 @@ and run_vv m (op, dest, src) =
       set_var m (Int (String.length s)) dest
   | BoolNot ->
       let b = get_bool (get_var m src) in
-      set_var m (Bool (not b)) dest );
+      set_var m (Bool (not b)) dest);
   next_ssa m
 
 and run_vvv m (op, dest, va, vb) =
@@ -877,21 +844,18 @@ and run_vvv m (op, dest, va, vb) =
         | Nil, Nil -> failwith "select: both nil"
         | Nil, v -> v
         | v, Nil -> v
-        | _, _ -> failwith "select: neither nil" )
+        | _, _ -> failwith "select: neither nil")
   in
   set_var m x dest;
   next_ssa m
 
 and run_vvi m (op, dest, var, i) =
-  ( match op with
+  (match op with
   | TuplePart ->
       let tuple = get_tuple (get_var m var) in
       set_var m tuple.(i) dest
-  | RecordField ->
-      let record = get_record (get_var m var) in
-      set_var m record.(i) dest
   | Capture ->
       let ({ capts } : funcval) = get_func (get_var m dest) in
-      capts.(i) <- get_var m var );
+      capts.(i) <- get_var m var);
   next_ssa m
 ;;

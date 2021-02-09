@@ -16,16 +16,12 @@ and pattern =
   | TuplePattern    of pattern list * datatype
   | ListPattern     of pattern list * datatype
   | ConsPattern     of pattern * pattern * datatype
-  | ArrayPattern    of pattern list * datatype
-  | RecordPattern   of record_pattern * datatype
   | VariablePattern of string * datatype
   | RefPattern      of pattern * datatype
   | Wildcard        of datatype
   | VariantPattern  of variant * pattern option * datatype
   | PatternList     of pattern list * datatype
   | PatternWithType of pattern * datatype
-
-and record_pattern = (field * pattern) list
 
 and expr =
   | Unit         of datatype
@@ -39,8 +35,6 @@ and expr =
   | Assign       of expr * expr * datatype
   | Tuple        of expr list * datatype
   | List         of expr list * datatype
-  | Array        of expr list * datatype
-  | Record       of record_expr
   | Call         of expr * expr * datatype
   | Unary        of Ast.unary_op * expr * datatype
   | Binary       of Ast.binary_op * expr * expr * datatype
@@ -52,8 +46,6 @@ and expr =
   | ExprWithType of expr * datatype
 
 and variable = expr option * string * datatype
-
-and record_expr = (string * expr) list * datatype
 
 and if_expr =
   expr (* cond *) * expr (* then *) * expr option (* else *) * datatype
@@ -86,9 +78,6 @@ and update_pattern tvtab = function
   | ConsPattern (a, b, t) ->
       ConsPattern
         (update_pattern tvtab a, update_pattern tvtab b, apply_real_type tvtab t)
-  | ArrayPattern (l, t) ->
-      ArrayPattern (List.map (update_pattern tvtab) l, apply_real_type tvtab t)
-  | RecordPattern (l, t) -> failwith "update_pattern"
   | VariablePattern (name, t) -> VariablePattern (name, apply_real_type tvtab t)
   | RefPattern (v, t) ->
       RefPattern (update_pattern tvtab v, apply_real_type tvtab t)
@@ -117,9 +106,6 @@ and update_expr tvtab = function
   | Tuple (l, t) ->
       Tuple (List.map (update_expr tvtab) l, apply_real_type tvtab t)
   | List (l, t) -> List (List.map (update_expr tvtab) l, apply_real_type tvtab t)
-  | Array (l, t) ->
-      Array (List.map (update_expr tvtab) l, apply_real_type tvtab t)
-  | Record (l, t) -> failwith "update_expr"
   | Call (clr, cle, t) ->
       Call
         (update_expr tvtab clr, update_expr tvtab cle, apply_real_type tvtab t)

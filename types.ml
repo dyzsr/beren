@@ -4,8 +4,6 @@ let { new_id = new_tyvar_id } = make_idgen 0
 
 let { new_id = new_variants_id } = make_idgen 0
 
-let { new_id = new_record_id } = make_idgen 0
-
 let { new_id = new_generic_id } = make_idgen 0
 
 (* Data types *)
@@ -16,17 +14,14 @@ type datatype =
   | Char
   | String
   | Ref
-  | Array
-  | Tyvar     of tyvar
-  | Tuple     of datatype list
-  | Variants  of id * variant list (* variants *)
-  | Record    of id * field list (* fields *)
-  | Interface of signature list
-  | Function  of datatype * datatype
-  | Generics  of id * tyvar list * datatype
-  | Specific  of datatype list * datatype
-  | Alias     of string * datatype (* a complete type with an alias *)
-  | Pending   of string
+  | Tyvar    of tyvar
+  | Tuple    of datatype list
+  | Variants of id * variant list (* variants *)
+  | Function of datatype * datatype
+  | Generics of id * tyvar list * datatype
+  | Specific of datatype list * datatype
+  | Alias    of string * datatype (* a complete type with an alias *)
+  | Pending  of string
 
 (* an incomplete type with only a name *)
 
@@ -34,10 +29,6 @@ type datatype =
 and tyvar = string * id
 
 and variant = int * string * datatype ref option
-
-and field = int * string (* name *) * datatype ref
-
-and signature = string * datatype ref
 
 let new_tyvar name = (name, new_tyvar_id ())
 
@@ -56,7 +47,6 @@ type symtab =
   { types : datatype Name_map.t
   ; values : datatype Name_map.t
   ; constructors : (variant * datatype) Name_map.t
-  ; fields : (field * datatype) Name_map.t
   }
 
 exception Unbound_type of string
@@ -99,17 +89,6 @@ let add_constructor name con ({ constructors } as symtab) =
 ;;
 
 exception Unbound_field of string
-
-let lookup_field name { fields } =
-  match Name_map.find_opt name fields with
-  | None -> raise (Unbound_field name)
-  | Some field -> field
-;;
-
-let add_field name field ({ fields } as symtab) =
-  let fields = Name_map.add name field fields in
-  { symtab with fields }
-;;
 
 (* Type variables table *)
 type tvtab =
@@ -200,10 +179,9 @@ let rec string_of_toplevel_datatype = function
       let tyvars_string = string_of_tyvars tyvars in
       match typ with
       | Ref -> "type " ^ tyvars_string ^ " ref"
-      | Array -> "type " ^ tyvars_string ^ " array"
       | _ ->
           let _, str = string_of_datatype tvtab 0 typ in
-          "type " ^ tyvars_string ^ " " ^ name ^ " = " ^ str )
+          "type " ^ tyvars_string ^ " " ^ name ^ " = " ^ str)
   | Alias (name, typ) ->
       let _, str = string_of_datatype empty_tvtab 0 typ in
       "type " ^ name ^ " = " ^ str
@@ -220,7 +198,6 @@ and string_of_datatype tvtab priority = function
   | Char -> (tvtab, "char")
   | String -> (tvtab, "string")
   | Ref -> failwith "string_of_datatype: ref"
-  | Array -> failwith "string_of_datatype: array"
   | Tyvar (name, key) ->
       let tvtab, name =
         match lookup_tyvar_opt name tvtab with
@@ -258,24 +235,6 @@ and string_of_datatype tvtab priority = function
       in
       let tvtab, strs = iter tvtab [] l in
       (tvtab, String.concat " | " (List.rev strs))
-  | Record (_, l) ->
-      let rec iter tvtab acc = function
-        | [] -> (tvtab, acc)
-        | (_, name, typ) :: l ->
-            let tvtab, str = string_of_datatype tvtab 0 !typ in
-            iter tvtab ((name ^ " : " ^ str) :: acc) l
-      in
-      let tvtab, strs = iter tvtab [] l in
-      (tvtab, "{ " ^ String.concat "; " (List.rev strs) ^ " }")
-  | Interface l ->
-      let rec iter tvtab acc = function
-        | [] -> (tvtab, acc)
-        | (name, typ) :: l ->
-            let tvtab, str = string_of_datatype tvtab 0 !typ in
-            iter tvtab ((name ^ " : " ^ str) :: acc) l
-      in
-      let tvtab, strs = iter tvtab [] l in
-      (tvtab, "sig " ^ String.concat "; " (List.rev strs) ^ " end")
   | Function (arg, body) ->
       let tvtab, arg = string_of_datatype tvtab 11 arg in
       let tvtab, body = string_of_datatype tvtab 10 body in
@@ -341,12 +300,10 @@ let print_symtab symtab =
 
 (* Update pending types in tuple, function, and generics *)
 let rec update_pending symtab = function
-  | (Unit | Bool | Int | Char | String | Ref | Array) as t -> t
+  | (Unit | Bool | Int | Char | String | Ref) as t -> t
   | Tyvar _ as t -> t
   | Tuple l -> Tuple (List.map (update_pending symtab) l)
   | Variants _ as t -> t
-  | Record _ as t -> t
-  | Interface _ as t -> t
   | Function (arg, body) ->
       Function (update_pending symtab arg, update_pending symtab body)
   | Generics (id, params, body) ->
@@ -358,9 +315,9 @@ let rec update_pending symtab = function
   | Pending name -> lookup_type name symtab
 ;;
 
-(* Resolve pending types inside variants, record, and interface *)
+(* Resolve pending types inside variants *)
 let rec resolve_pending symtab = function
-  | Unit | Bool | Int | Char | String | Ref | Array | Tyvar _ | Alias _ -> ()
+  | Unit | Bool | Int | Char | String | Ref | Tyvar _ | Alias _ -> ()
   | Tuple l -> List.iter (resolve_pending symtab) l
   | Variants (_, l) ->
       let resolve_variant : variant -> unit = function
@@ -368,16 +325,6 @@ let rec resolve_pending symtab = function
         | _, _, Some typ -> typ := update_pending symtab !typ
       in
       List.iter resolve_variant l
-  | Record (_, l) ->
-      let resolve_field ((_, _, typ) : field) =
-        typ := update_pending symtab !typ
-      in
-      List.iter resolve_field l
-  | Interface l ->
-      let resolve_signature ((_, typ) : signature) =
-        typ := update_pending symtab !typ
-      in
-      List.iter resolve_signature l
   | Function (arg, body) ->
       resolve_pending symtab arg;
       resolve_pending symtab body
@@ -390,14 +337,14 @@ let rec resolve_pending symtab = function
 
 (* Filter types with pending inside *)
 let rec filter_pending = function
-  | Unit | Bool | Int | Char | String | Ref | Array | Tyvar _ -> false
+  | Unit | Bool | Int | Char | String | Ref | Tyvar _ -> false
   | Tuple l ->
       let rec iter = function
         | [] -> false
         | h :: t -> if filter_pending h then true else iter t
       in
       iter l
-  | Variants _ | Record _ | Interface _ -> false
+  | Variants _ -> false
   | Function (arg, body) -> filter_pending arg || filter_pending body
   | Generics (_, _, body) -> filter_pending body
   | Specific (args, body) ->
@@ -408,9 +355,9 @@ let rec filter_pending = function
   | Pending _ -> true
 ;;
 
-let rec extract_alias = function Alias (_, typ) -> typ | t -> t
+let extract_alias = function Alias (_, typ) -> typ | t -> t
 
-let rec extract_generics_id (id, params, typ) =
+let extract_generics_id (id, params, typ) =
   (* TODO: wrong here !! *)
   match typ with
   | Specific (_, Alias (_, Generics (inner_id, vars, _)))
@@ -419,7 +366,7 @@ let rec extract_generics_id (id, params, typ) =
   | _ -> id
 ;;
 
-let rec extract_param_type = function
+let extract_param_type = function
   | Specific (typs, _) -> typs
   | _ -> failwith "extract_param_type"
 ;;
@@ -431,7 +378,6 @@ exception Not_generic_type of string
 let rec check_datatype = function
   | Unit | Bool | Int | Char | String -> ()
   | Ref -> failwith "check_datatype: ref"
-  | Array -> failwith "check_datatype: array"
   | Tyvar _ -> ()
   | Tuple l -> List.iter check_datatype l
   | Variants (_, l) ->
@@ -440,12 +386,10 @@ let rec check_datatype = function
         | _, _, Some t -> check_datatype !t
       in
       List.iter aux l
-  | Record (_, l) -> List.iter (fun (_, _, t) -> check_datatype !t) l
-  | Interface l -> List.iter (fun (_, t) -> check_datatype !t) l
   | Function (arg, body) ->
       check_datatype arg;
       check_datatype body
-  | Generics (_, _, Ref) | Generics (_, _, Array) -> ()
+  | Generics (_, _, Ref) -> ()
   | Generics (_, _, body) -> check_datatype body
   | Specific (args, body) -> (
       List.iter check_datatype args;
@@ -454,7 +398,7 @@ let rec check_datatype = function
           if List.length args <> List.length tyvars then
             raise (Type_arity_mismatch name)
       | Alias (name, _) -> raise (Not_generic_type name)
-      | t -> raise (Not_generic_type (get_type_string t)) )
+      | t -> raise (Not_generic_type (get_type_string t)))
   | Alias (_, Alias (name, Generics _)) -> raise (Type_arity_mismatch name)
   | Alias _ -> ()
   | Pending _ -> failwith "check_datatype: pending"
@@ -489,11 +433,6 @@ let list_nil, list_cons =
 (* define ref *)
 let ref_type = Alias ("ref", Generics (new_tyvar_id (), [ new_tyvar "a" ], Ref))
 
-(* define array *)
-let array_type =
-  Alias ("array", Generics (new_tyvar_id (), [ new_tyvar "a" ], Array))
-;;
-
 (* type table *)
 let default_symtab =
   (* save default types *)
@@ -505,7 +444,6 @@ let default_symtab =
     ; ("string", Alias ("string", String))
     ; ("list", list_type)
     ; ("ref", ref_type)
-    ; ("array", array_type)
     ]
   in
   let default_types = make_string_map default_type_list in
@@ -532,19 +470,18 @@ let default_symtab =
   { types = default_types
   ; values = default_values
   ; constructors = default_constructors
-  ; fields = Name_map.empty
   }
 ;;
 
 let rec apply_real_type tvtab = function
-  | (Unit | Bool | Int | Char | String | Ref | Array) as t -> t
+  | (Unit | Bool | Int | Char | String | Ref) as t -> t
   | Tyvar (_, key) -> (
       let tvtab, t = find_id key tvtab in
       match t with
       | Tyvar (_, id) when id = key -> t
-      | _ -> apply_real_type tvtab t )
+      | _ -> apply_real_type tvtab t)
   | Tuple l -> Tuple (List.map (apply_real_type tvtab) l)
-  | (Variants _ | Record _ | Interface _) as t -> t
+  | Variants _ as t -> t
   | Function (arg, body) ->
       Function (apply_real_type tvtab arg, apply_real_type tvtab body)
   (* | Generics _ as t -> t *)
@@ -558,21 +495,21 @@ let rec apply_real_type tvtab = function
 ;;
 
 let rec apply_generics tvtab = function
-  | (Unit | Bool | Int | Char | String | Ref | Array) as t -> t
+  | (Unit | Bool | Int | Char | String | Ref) as t -> t
   | Tyvar (_, key) as typ -> (
-      match lookup_id key tvtab with Some t -> t | None -> typ )
+      match lookup_id key tvtab with Some t -> t | None -> typ)
   | Tuple l -> Tuple (List.map (apply_generics tvtab) l)
-  | (Variants _ | Record _ | Interface _) as t -> t
+  | Variants _ as t -> t
   | Function (arg, body) ->
       Function (apply_generics tvtab arg, apply_generics tvtab body)
   | Specific (args, Alias (_, Generics (_, tyvars, body))) as t -> (
       match body with
-      | Variants _ | Record _ | Interface _ -> t
+      | Variants _ -> t
       | _ ->
           let args = List.map (apply_generics tvtab) args in
           let fold tvtab (_, key) arg = add_id key arg tvtab in
           let tvtab = List.fold_left2 fold tvtab tyvars args in
-          apply_generics tvtab body )
+          apply_generics tvtab body)
   | Alias (_, typ) -> apply_real_type tvtab typ
   | t ->
       let _, msg = string_of_datatype empty_tvtab 0 t in

@@ -292,8 +292,6 @@ and walk_pattern env nameids src_var failure_target = function
       in
       let ast = Typed_ast.VariantPattern (Types.list_cons, Some sub_p, t) in
       walk_pattern env nameids src_var failure_target ast
-  | Typed_ast.ArrayPattern (l, _) -> failwith "walk_pattern"
-  | Typed_ast.RecordPattern (l, _) -> failwith "walk_pattern"
   | Typed_ast.VariablePattern (name, _) ->
       let nameid = Name_map.find name nameids in
       let proc =
@@ -447,8 +445,6 @@ and walk_expr scope env globenv dest_var = function
               , t )
           in
           walk_expr scope env globenv dest_var ast )
-  | Typed_ast.Array _ -> failwith "walk_expr: array"
-  | Typed_ast.Record _ -> failwith "walk_expr: record"
   | Typed_ast.Call (clr, cle, _) ->
       let caller = Vm.Local (new_var env ~prefix:"%var") in
       let callee = Vm.Local (new_var env ~prefix:"%var") in

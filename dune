@@ -29,4 +29,4 @@
 
 (env
  (dev
-   (flags (:standard -w -A))))
+   (flags (:standard -w -9 -w -27))))

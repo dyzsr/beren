@@ -21,7 +21,6 @@ rule lex = parse
   | "\""        { lex_string [] lexbuf }
   | "let"       { LET }
   | "type"      { TYPE }
-  | "method"    { METHOD }
   | "and"       { AND }
   | "rec"       { REC }
   | "in"        { IN }
@@ -33,8 +32,6 @@ rule lex = parse
   | "else"      { ELSE }
   | "match"     { MATCH }
   | "with"      { WITH }
-  | "sig"       { SIG }
-  | "end"       { END }
   | "+"   { PLUS }
   | "-"   { MINUS }
   | "*"   { TIMES }
@@ -53,10 +50,6 @@ rule lex = parse
   | ")"   { RPAREN }
   | "["   { LBRACK }
   | "]"   { RBRACK }
-  | "{"   { LBRACE }
-  | "}"   { RBRACE }
-  | "[|"  { LBRACKBAR }
-  | "|]"  { RBRACKBAR }
   | "|"   { BAR }
   | "@"   { APPEND }
   | "::"  { CONS }

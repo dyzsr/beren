@@ -21,12 +21,11 @@ let make_variable_pattern name =
 %}
 
 %token EOF
-%token LET "let" TYPE "type" METHOD "method" AND "and"
+%token LET "let" TYPE "type" AND "and"
 %token REC "rec" IN "in" OF "of"
 %token FUN "fun" FUNCTION "function"
 %token IF "if" THEN "then" ELSE "else"
 %token MATCH "match" WITH "with"
-%token SIG "sig" END "end"
 
 %token WILDCARD "_"
 %token <int> INT
@@ -40,8 +39,7 @@ let make_variable_pattern name =
 %token PLUS "+" MINUS "-" TIMES "*" DIV "/" MOD "%" CONCAT "^"
 %token LT "<" LTE "<=" GT ">" GTE ">=" EQ "=" NEQ "!="
 %token LOGIC_AND "&&" LOGIC_OR "||"
-%token LPAREN "(" RPAREN ")" LBRACK "[" RBRACK "]" LBRACE "{" RBRACE "}"
-%token LBRACKBAR "[|" RBRACKBAR "|]"
+%token LPAREN "(" RPAREN ")" LBRACK "[" RBRACK "]"
 %token BAR "|" APPEND "@" CONS "::" DEREF "!"
 %token TO "=>" ARROW "->" ASSIGN ":="
 %token SEMICOLON ";" COLON ":" COMMA "," PERIOD "."
@@ -68,7 +66,6 @@ global_decl_list:
 
 global_decl:
     decl=let_decl { ValueBindings decl }
-  | decl=method_decl { MethodBindings decl }
   | decl=type_decl { TypeBindings decl }
 
 let_decl:
@@ -98,21 +95,8 @@ fun_binding:
     id=IDENT proto=prototype "=" e=expr
       { (VariablePattern id, val_of_fun e proto) }
 
-method_decl:
-    "method" b=method_binding
-      { (true, [b]) }
-  | "method" b=method_binding "and" l=method_binding_list
-      { (true, b::l) }
-
-method_binding:
-    r=receiver b=fun_binding { (r, b) }
-
 receiver:
     p=pattern_with_type { p }
-
-method_binding_list:
-    b=method_binding { [b] }
-  | b=method_binding "and" l=method_binding_list { b :: l }
 
 prototype:
     l=arg_list { Prototype (l, None) }
@@ -150,8 +134,6 @@ type_variable:
 type_construct:
     t=type_expr { TypeExpr t }
   | t=variants_type { t }
-  | t=record_type { t }
-  | t=interface_type { t }
 
 variants_type:
     l=variant_list { VariantsType l }
@@ -165,10 +147,6 @@ variant:
     cid=CAPID { (cid, None) }
   | cid=CAPID "of" t=type_expr { (cid, Some t) }
 
-record_type:
-    "{" "}" { RecordType [] }
-  | "{" l=field_type_list "}" { RecordType l }
-
 field_type_list:
     t=field_type { [t] }
   | t=field_type ";" { [t] }
@@ -176,10 +154,6 @@ field_type_list:
 
 field_type:
     id=IDENT ":" t=type_expr { (id, t) }
-
-interface_type:
-    "sig" "end" { InterfaceType [] }
-  | "sig" l=signature_type_list "end" { InterfaceType l }
 
 signature_type_list:
     t=signature_type { [t] }
@@ -310,8 +284,6 @@ pattern_terminal:
   | p=unit_pattern { p }
   | p=tuple_pattern { p }
   | p=list_pattern { p }
-  | p=array_pattern { p }
-  | p=record_pattern { p }
   | p=variable_pattern { p }
   | p=variant_pattern { p }
 
@@ -332,17 +304,9 @@ list_pattern:
     "[" "]" { ListPattern [] }
   | "[" l=pattern_item_list "]" { ListPattern l }
 
-array_pattern:
-    "[|" "|]" { ArrayPattern [] }
-  | "[|" l=pattern_item_list "|]" { ArrayPattern l }
-
 pattern_item_list:
     p=pattern { [p] }
   | p=pattern "," l=pattern_item_list { p :: l }
-
-record_pattern:
-    "{" "}" { RecordPattern [] }
-  | "{" l=field_pattern_list "}" { RecordPattern l }
 
 field_pattern_list:
     p=field_pattern { [p] }
@@ -454,8 +418,6 @@ terminal:
   | e=unit { e }
   | e=tuple { e }
   | e=list_value { e }
-  | e=array { e }
-  | e=record { e }
 
 literal:
     b=BOOL { Bool b }
@@ -478,17 +440,9 @@ list_value:
     "[" "]" { List [] }
   | "[" l=item_list "]" { List l }
 
-array:
-    "[|" "|]" { Array [] }
-  | "[|" l=item_list "|]" { Array l }
-
 item_list:
     e=expr { [e] }
   | e=expr "," l=item_list { e :: l }
-
-record:
-    "{" "}" { Record [] }
-  | "{" l=field_list "}" { Record l }
 
 field_list:
     f=field_binding { [f] }

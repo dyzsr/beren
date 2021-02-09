@@ -112,8 +112,6 @@ and walk_type_binding symtab ((params_opt, name, construct) : Ast.type_binding)
 and walk_type_construct symtab tvtab = function
   | Ast.TypeExpr t -> walk_type_expr symtab tvtab t
   | Ast.VariantsType t -> walk_variants_type symtab tvtab t
-  | Ast.RecordType t -> walk_record_type symtab tvtab t
-  | Ast.InterfaceType t -> walk_interface_type symtab tvtab t
 
 and walk_type_op symtab tvtab is_decl =
   (* let () = print_endline ("from type expr") in *)
@@ -129,7 +127,7 @@ and walk_type_op symtab tvtab is_decl =
                 let id = new_tyvar_id () in
                 let tvtab = bind_tyvar name id tvtab in
                 (tvtab, Tyvar (name, id))
-            | Some id -> (tvtab, Tyvar (name, id)) ) )
+            | Some id -> (tvtab, Tyvar (name, id))))
   | Ast.TupleType l ->
       let rec iter tvtab acc = function
         | [] -> (tvtab, acc)
@@ -164,20 +162,6 @@ and walk_variants_type symtab tvtab (l : Ast.variants_type) =
     | name, Some expr -> (i, name, Some (ref (walk_type_expr symtab tvtab expr)))
   in
   Variants (new_variants_id (), List.mapi from_variant l)
-
-and walk_record_type symtab tvtab (l : Ast.record_type) =
-  (* let () = print_endline ("from record type") in *)
-  let from_field i (name, expr) =
-    (i, name, ref (walk_type_expr symtab tvtab expr))
-  in
-  Record (new_record_id (), List.mapi from_field l)
-
-and walk_interface_type symtab tvtab (l : Ast.interface_type) =
-  (* let () = print_endline ("from interface type") in *)
-  let from_method (name, expr) =
-    (name, ref (walk_type_expr symtab tvtab expr))
-  in
-  Interface (List.map from_method l)
 ;;
 
 (* Match destination type with source type in a value binding *)
@@ -202,13 +186,8 @@ let rec agree_on_type tvtab dest src =
   | _, Generics _ -> failwith "agree_on_type: generics"
   | Alias (name, d), s -> agree_on_type tvtab d s
   | d, Alias (name, s) -> agree_on_type tvtab d s
-  | Unit, Unit
-  | Bool, Bool
-  | Int, Int
-  | Char, Char
-  | String, String
-  | Ref, Ref
-  | Array, Array ->
+  | Unit, Unit | Bool, Bool | Int, Int | Char, Char | String, String | Ref, Ref
+    ->
       tvtab
   (* union-find *)
   | Tyvar (_, id1), Tyvar (_, id2) ->
@@ -229,21 +208,18 @@ let rec agree_on_type tvtab dest src =
       let tvtab, t = find_id id tvtab in
       match t with
       | Tyvar (_, root) -> add_id root d tvtab
-      | _ -> agree_on_type tvtab d t )
+      | _ -> agree_on_type tvtab d t)
   | Tyvar (_, id), s -> (
       (* let () = print_endline "agree_on_type: type_var src" in *)
       let tvtab, t = find_id id tvtab in
       match t with
       | Tyvar (_, root) -> add_id root s tvtab
-      | _ -> agree_on_type tvtab t s )
+      | _ -> agree_on_type tvtab t s)
   | (Tuple dest as d), (Tuple src as s) -> (
       try List.fold_left2 agree_on_type tvtab dest src
-      with Incompatible_types _ -> raise_incompatible_types d s )
+      with Incompatible_types _ -> raise_incompatible_types d s)
   | Variants (did, d), Variants (sid, s) ->
       if did = sid then tvtab else raise Type_mismatch
-  | Record (did, d), Record (sid, s) ->
-      if did = sid then tvtab else raise Type_mismatch
-  | Interface d, s -> failwith "agree_on_interface"
   | Function (darg, dbody), Function (sarg, sbody) ->
       let tvtab = agree_on_type tvtab darg sarg in
       agree_on_type tvtab dbody sbody
@@ -265,7 +241,7 @@ let rec agree_on_type tvtab dest src =
      agree_on_generics tvtab (did, dvars, dbody) (sid, svars, sbody) *)
   | d, s -> (
       try raise_incompatible_types d s
-      with Failure msg -> failwith ("agree_on_type: " ^ msg) )
+      with Failure msg -> failwith ("agree_on_type: " ^ msg))
 
 and agree_on_specifics tvtab dest src =
   match (dest, src) with
@@ -278,11 +254,11 @@ and agree_on_specifics tvtab dest src =
         let d = get_type_string d in
         let s = get_type_string s in
         raise (Incompatible_types (d, s))
-      with Failure msg -> failwith ("agree_on_type: " ^ msg) )
+      with Failure msg -> failwith ("agree_on_type: " ^ msg))
   | d, s -> agree_on_type tvtab d s
 ;;
 
-(* 
+(*
 and agree_on_generics tvtab t1 t2 =
   let did = extract_generics_id t1 in
   let sid = extract_generics_id t2 in
@@ -309,13 +285,13 @@ let make_tyvars (tyvars : tyvar list) =
 ;;
 
 let rec substitute_tyvars tvtab = function
-  | (Unit | Bool | Int | Char | String | Ref | Array) as t -> t
+  | (Unit | Bool | Int | Char | String | Ref) as t -> t
   | Tyvar (_, id) -> (
       match lookup_id id tvtab with
       | Some t -> t
-      | None -> failwith "substitute_tyvars: id is not found" )
+      | None -> failwith "substitute_tyvars: id is not found")
   | Tuple l -> Tuple (List.map (substitute_tyvars tvtab) l)
-  | (Variants _ | Record _ | Interface _ | Generics _) as t -> t
+  | (Variants _ | Generics _) as t -> t
   | Function (arg, body) ->
       Function (substitute_tyvars tvtab arg, substitute_tyvars tvtab body)
   | Specific (args, body) ->
@@ -431,8 +407,6 @@ and walk_expr symtab tvtab = function
       let typ = Tuple (List.rev typs) in
       (tvtab, typ, Typed_ast.Tuple (asts, typ))
   | Ast.List l -> walk_list symtab tvtab l
-  | Ast.Array l -> walk_array symtab tvtab l
-  | Ast.Record l -> walk_record symtab tvtab l
   | Ast.Call (c, e) -> walk_call symtab tvtab (c, e)
   | Ast.Unary (op, e) -> walk_unary symtab tvtab (op, e)
   | Ast.Binary (op, a, b) -> walk_binary symtab tvtab (op, a, b)
@@ -507,11 +481,6 @@ and walk_list symtab tvtab l =
   let typ = Specific ([ typ ], list_type) in
   (tvtab, typ, Typed_ast.List (asts, typ))
 
-and walk_array symtab tvtab l =
-  let tvtab, typ, asts = walk_item_list symtab tvtab l in
-  let typ = Specific ([ typ ], array_type) in
-  (tvtab, typ, Typed_ast.Array (asts, typ))
-
 and walk_item_list symtab tvtab l =
   let acc_typ = Tyvar (new_tyvar "a") in
   let aux (tvtab, acc_asts) e =
@@ -522,8 +491,6 @@ and walk_item_list symtab tvtab l =
   let tvtab, acc_asts = List.fold_left aux (tvtab, []) l in
   let acc_asts = List.rev acc_asts in
   (tvtab, acc_typ, acc_asts)
-
-and walk_record symtab tvtab l = failwith "walk_record"
 
 and walk_call symtab tvtab (c, e) =
   let tvtab, caller, caller_ast = walk_expr symtab tvtab c in
@@ -655,7 +622,7 @@ and walk_pattern symtab tvtab = function
       ([], tvtab, String, Typed_ast.StringPattern (s, String))
   | Ast.UnitPattern -> ([], tvtab, Unit, Typed_ast.UnitPattern Unit)
   | Ast.TuplePattern l ->
-      let rec aux (tvtab, bindings, acc_typs, acc_asts) p =
+      let aux (tvtab, bindings, acc_typs, acc_asts) p =
         let new_bindings, tvtab, typ, ast = walk_pattern symtab tvtab p in
         (tvtab, new_bindings @ bindings, typ :: acc_typs, ast :: acc_asts)
       in
@@ -672,11 +639,6 @@ and walk_pattern symtab tvtab = function
       let bindings, tvtab, typ, asts = walk_pattern_item_list symtab tvtab l in
       let typ = Specific ([ typ ], list_type) in
       (bindings, tvtab, typ, Typed_ast.ListPattern (asts, typ))
-  | Ast.ArrayPattern l ->
-      let bindings, tvtab, typ, asts = walk_pattern_item_list symtab tvtab l in
-      let typ = Specific ([ typ ], array_type) in
-      (bindings, tvtab, typ, Typed_ast.ArrayPattern (asts, typ))
-  | Ast.RecordPattern l -> walk_record_pattern symtab tvtab l
   | Ast.RefPattern p ->
       let bindings, tvtab, typ, ast = walk_pattern symtab tvtab p in
       let typ = Specific ([ typ ], ref_type) in
@@ -708,8 +670,6 @@ and walk_pattern_item_list symtab tvtab l =
   let bindings, tvtab, acc_asts = List.fold_left aux ([], tvtab, []) l in
   (List.rev bindings, tvtab, acc_typ, List.rev acc_asts)
 
-and walk_record_pattern symtab tvtab l = failwith "walk_record_pattern"
-
 and walk_variant_pattern symtab tvtab (name, pattern_opt) =
   let variant, typ = lookup_constructor name symtab in
   match pattern_opt with
@@ -734,7 +694,7 @@ and walk_variant_pattern symtab tvtab (name, pattern_opt) =
             | Alias (_, Generics (_, tyvars, t)) ->
                 let tyvars, varmap = make_tyvars tyvars in
                 (substitute_tyvars varmap content_typ, Specific (tyvars, typ))
-            | _ -> (content_typ, typ) )
+            | _ -> (content_typ, typ))
       in
       let tvtab = agree_on_type tvtab content_typ pattern_typ in
       ( bindings
@@ -744,7 +704,7 @@ and walk_variant_pattern symtab tvtab (name, pattern_opt) =
 
 and walk_pattern_list symtab tvtab l =
   let acc_typ = Tyvar (new_tyvar "a") in
-  let rec aux (bindings_list, tvtab, pattern_asts) p =
+  let aux (bindings_list, tvtab, pattern_asts) p =
     let bindings, tvtab, typ, ast = walk_pattern symtab tvtab p in
     let tvtab = agree_on_type tvtab acc_typ typ in
     (bindings :: bindings_list, tvtab, ast :: pattern_asts)
@@ -777,8 +737,6 @@ and walk_pattern_list symtab tvtab l =
   (bindings, tvtab, acc_typ, Typed_ast.PatternList (pattern_asts, acc_typ))
 ;;
 
-let rec walk_method_bindings symtab (r, l) = failwith "walk_method_bindings"
-
 let walk_decl symtab = function
   | Ast.TypeBindings b ->
       let symtab = walk_type_bindings symtab b in
@@ -787,7 +745,6 @@ let walk_decl symtab = function
       let () = print_endline "# Walk value declaration" in
       let symtab, _, ast = walk_value_bindings symtab empty_tvtab b in
       (symtab, Some (Typed_ast.ValueBindings ast))
-  | Ast.MethodBindings b -> walk_method_bindings symtab b
 ;;
 
 let walk_decl_list l =
