@@ -95,9 +95,6 @@ fun_binding:
     id=IDENT proto=prototype "=" e=expr
       { (VariablePattern id, val_of_fun e proto) }
 
-receiver:
-    p=pattern_with_type { p }
-
 prototype:
     l=arg_list { Prototype (l, None) }
   | l=arg_list ":" t=type_expr { Prototype (l, Some t) }
@@ -146,22 +143,6 @@ variant_list:
 variant:
     cid=CAPID { (cid, None) }
   | cid=CAPID "of" t=type_expr { (cid, Some t) }
-
-field_type_list:
-    t=field_type { [t] }
-  | t=field_type ";" { [t] }
-  | t=field_type ";" l=field_type_list { t :: l }
-
-field_type:
-    id=IDENT ":" t=type_expr { (id, t) }
-
-signature_type_list:
-    t=signature_type { [t] }
-  | t=signature_type ";" { [t] }
-  | t=signature_type ";" l=signature_type_list { t :: l }
-
-signature_type:
-    id=IDENT ":" t=type_expr { (id, t) }
 
 type_expr:
     t=type_infix_function { t }
@@ -308,14 +289,6 @@ pattern_item_list:
     p=pattern { [p] }
   | p=pattern "," l=pattern_item_list { p :: l }
 
-field_pattern_list:
-    p=field_pattern { [p] }
-  | p=field_pattern ";" { [p] }
-  | p=field_pattern ";" l=field_pattern_list { p :: l }
-
-field_pattern:
-    id=IDENT "=" p=pattern { (id, p) }
-
 variable_pattern:
     id=IDENT { make_variable_pattern id }
   | WILDCARD { Wildcard }
@@ -443,14 +416,6 @@ list_value:
 item_list:
     e=expr { [e] }
   | e=expr "," l=item_list { e :: l }
-
-field_list:
-    f=field_binding { [f] }
-  | f=field_binding ";" { [f] }
-  | f=field_binding ";" l=field_list { f :: l }
-
-field_binding:
-    id=IDENT "=" e=expr { (id, e) }
 
 call:
     caller=caller e=highest_prec { Call (caller, e) }
